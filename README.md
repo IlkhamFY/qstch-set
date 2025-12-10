@@ -1,6 +1,6 @@
 # STCH-BoTorch
 
-A production-grade Python library for **Smooth Tchebycheff (STCH)** scalarization methods for multi-objective Bayesian optimization with BoTorch.
+A Python library for **Smooth Tchebycheff (STCH)** scalarization methods for multi-objective Bayesian optimization with BoTorch.
 
 ## Overview
 
