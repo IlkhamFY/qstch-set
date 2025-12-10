@@ -17,7 +17,7 @@ pip install stch-botorch
 For development:
 
 ```bash
-git clone https://github.com/yourusername/stch-botorch.git
+git clone https://github.com/IlkhamFY/stch-botorch.git
 cd stch-botorch
 pip install -e ".[dev]"
 ```
