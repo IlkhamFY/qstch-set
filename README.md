@@ -270,6 +270,62 @@ If you use STCH-BoTorch in your research, please cite:
 }
 ```
 
+## STCH-qPMHI: Two-Stage Batch Selection
+
+STCH-qPMHI combines STCH scalarization with qPMHI (Probability of Maximum Hypervolume Improvement) for efficient batch selection in large-scale multi-objective optimization.
+
+### Overview
+
+The framework operates in two stages:
+1. **Stage 1 (STCH Candidate Generation)**: Generate diverse candidate pool using STCH scalarization with multiple weight vectors
+2. **Stage 2 (qPMHI Batch Selection)**: Select optimal batch by ranking candidates using qPMHI probability scores
+
+This approach leverages the efficiency of gradient-based STCH optimization for exploration, combined with hypervolume-optimal batch selection via qPMHI.
+
+### Usage
+
+```python
+import torch
+from stch_botorch import optimize_stch_qpmhi
+from botorch.models import SingleTaskGP
+from botorch.fit import fit_gpytorch_mll
+from gpytorch.mlls import ExactMarginalLogLikelihood
+
+# Fit model
+model = SingleTaskGP(train_X, train_Y)
+mll = ExactMarginalLogLikelihood(model.likelihood, model)
+fit_gpytorch_mll(mll)
+
+# Compute Pareto front
+pareto_Y = compute_pareto_front(train_Y)
+ref_point = torch.tensor([0.0, 0.0])  # Reference point for hypervolume
+
+# Select batch
+bounds = torch.stack([torch.zeros(2), torch.ones(2)])
+batch = optimize_stch_qpmhi(
+    model=model,
+    bounds=bounds,
+    pareto_Y=pareto_Y,
+    ref_point=ref_point,
+    q=4,  # Batch size
+    num_candidates=200,  # Candidate pool size
+)
+
+# Evaluate batch and update data
+batch_Y = objective_function(batch)
+train_X = torch.cat([train_X, batch], dim=0)
+train_Y = torch.cat([train_Y, batch_Y], dim=0)
+```
+
+### Objective Convention
+
+**Important**: Both STCH and qPMHI assume **maximization semantics** in objective space (higher is better). For minimization problems, negate your objectives before passing them to the model.
+
+- **qPMHI**: Uses hypervolume which requires maximization objectives. The reference point should be dominated by all feasible outcomes.
+- **STCH**: The scalarization formula `ref_point - Y` assumes minimization, but when used for candidate generation with maximization objectives, the reference point should be set appropriately (e.g., using the ideal point from training data).
+
+See the [tutorial notebook](notebooks/stch_qpmhi_tutorial.ipynb) for complete examples.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.

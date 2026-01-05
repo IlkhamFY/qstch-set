@@ -38,6 +38,12 @@ dev = [
     "mypy>=1.0.0",
     "ruff>=0.1.0",
 ]
+bench = [
+    "pandas>=1.3.0",
+    "matplotlib>=3.5.0",
+    "seaborn>=0.12.0",
+    "scipy>=1.9.0",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
