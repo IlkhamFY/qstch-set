@@ -95,8 +95,8 @@ class TestSmoothChebyshev:
         weights = torch.tensor([0.5, 0.5])
         ref_point = torch.tensor([0.0, 0.0])
 
-        # Compute true Tchebycheff: max(w_i * (z*_i - y_i))
-        weighted_distances = weights * (ref_point - Y)
+        # Compute true Tchebycheff: utility = -max(w_i * (Y_i - z*_i))
+        weighted_distances = weights * (Y - ref_point)
         tch_values = -weighted_distances.max(dim=-1)[0]  # Negative for maximization
 
         # Compute STCH with decreasing mu

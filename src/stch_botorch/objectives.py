@@ -17,7 +17,7 @@ class SmoothChebyshevObjective(MCMultiOutputObjective):
     """Smooth Tchebycheff objective for multi-output optimization.
 
     BoTorch maximizes this utility. Lower Y is preferred (minimization semantics).
-    Formula: mu * log( sum( exp( weights * (ref_point - Y) / mu ) ) )
+    Formula: -mu * log( sum( exp( weights * (Y - ref_point) / mu ) ) )
 
     This objective maps samples of shape (sample_shape x batch_shape x q x m)
     to shape (sample_shape x batch_shape x q), where:
@@ -94,6 +94,7 @@ class SmoothChebyshevSetObjective(MCMultiOutputObjective):
     Advanced use only. Returns (sample_shape x batch_shape), not standard (... x q) shape.
     Use with `qSimpleRegret` or `FixedFeatureAcquisition`, not standard `qEI`.
     BoTorch maximizes this utility. Lower Y is preferred (minimization semantics).
+    Per Lin et al. ICLR 2025 Eq. 12.
 
     This objective aggregates over the q dimension internally, mapping samples of shape
     (sample_shape x batch_shape x q x m) to shape (sample_shape x batch_shape).

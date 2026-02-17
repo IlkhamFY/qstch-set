@@ -50,7 +50,7 @@ def smooth_chebyshev(
     """Smooth Tchebycheff scalarization.
 
     BoTorch maximizes this utility. Lower Y is preferred (minimization semantics).
-    Formula: mu * log( sum( exp( weights * (ref_point - Y) / mu ) ) )
+    Formula: -mu * log( sum( exp( weights * (Y - ref_point) / mu ) ) )
 
     This function approximates the max operator in standard Tchebycheff using
     LogSumExp for differentiability.
@@ -106,13 +106,14 @@ def smooth_chebyshev(
             f"got {weights.shape[-1]}"
         )
 
-    # Compute weighted distances: D_i = w_i * (z*_i - y_i)
+    # Compute weighted deviations: D_i = w_i * (y_i - z*_i)
+    # Per Lin et al. ICLR 2025 Eq. 5: g_STCH = mu * log(sum(exp(w_i(f_i - z*_i) / mu)))
     # Shape: (..., m)
-    weighted_distances = weights * (ref_point - Y)
+    weighted_distances = weights * (Y - ref_point)
 
-    # Smooth max using LogSumExp: U(y) = -mu * logsumexp(D_i / mu, dim=-1)
-    # We use -mu * logsumexp because we want to maximize utility
-    # Formula: mu * log( sum( exp( weights * (ref_point - Y) / mu ) ) )
+    # BoTorch maximizes utility, so negate the scalarization:
+    # utility = -g_STCH = -mu * logsumexp(w_i(Y_i - z*_i) / mu)
+    # Lower Y → lower g_STCH → higher utility (correct for minimization objectives)
     utility = -mu * torch.logsumexp(weighted_distances / mu, dim=-1)
 
     return utility
@@ -127,7 +128,7 @@ def smooth_chebyshev_set(
     """Smooth Tchebycheff Set scalarization ("Few for Many").
 
     BoTorch maximizes this utility. Lower Y is preferred (minimization semantics).
-    Formula: mu * log( sum( exp( weights * (ref_point - Y) / mu ) ) )
+    Per Lin et al. ICLR 2025 Eq. 12.
 
     This function optimizes a batch of candidates to collectively cover all
     objectives. It uses nested smoothing: smooth min over the batch, then smooth
@@ -189,10 +190,11 @@ def smooth_chebyshev_set(
             f"got {weights.shape[-1]}"
         )
 
-    # Compute weighted distances for each candidate k and objective i
-    # R_ik = w_i * (z*_i - y_ik)
+    # Compute weighted deviations for each candidate k and objective i
+    # R_ik = w_i * (y_ik - z*_i)
+    # Per Lin et al. ICLR 2025 Eq. 12
     # Shape: (..., q, m)
-    R_ik = weights * (ref_point - Y)
+    R_ik = weights * (Y - ref_point)
 
     # Inner aggregation: Smooth min over batch (dim=-2, the q dimension)
     # R_i^{min} = -mu * logsumexp(-R_ik / mu, dim=-2)

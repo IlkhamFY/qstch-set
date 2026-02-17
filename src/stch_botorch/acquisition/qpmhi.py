@@ -10,6 +10,7 @@ from typing import Optional
 import torch
 from botorch.acquisition.monte_carlo import MCAcquisitionFunction
 from botorch.models.model import Model
+from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputObjective
 from botorch.sampling import SobolQMCNormalSampler
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 from torch import Tensor
@@ -69,6 +70,10 @@ class qPMHI(MCAcquisitionFunction):
         # Set default sampler
         if sampler is None:
             sampler = SobolQMCNormalSampler(sample_shape=torch.Size([512]))
+
+        # For multi-output models, we need an objective to avoid BoTorch error
+        if objective is None and model.num_outputs > 1:
+            objective = IdentityMCMultiOutputObjective()
 
         # Initialize parent class
         super().__init__(model=model, sampler=sampler, objective=objective)

@@ -304,6 +304,7 @@ class STCHqPMHIAcquisition:
         self.num_candidates = num_candidates
 
         stch_kwargs = stch_kwargs or {}
+        stch_kwargs.pop("num_weights", None)
         self.candidate_generator = STCHCandidateGenerator(
             model=model, bounds=bounds, num_weights=num_candidates, **stch_kwargs
         )

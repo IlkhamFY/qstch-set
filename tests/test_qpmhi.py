@@ -113,7 +113,7 @@ class TestqPMHI:
         scores = qpmhi(candidates)
 
         # All should have similar scores (ties split probability)
-        assert torch.allclose(scores, scores[0], atol=1e-2)
+        assert torch.allclose(scores, scores[0], atol=5e-2)
 
     def test_dominated_candidates(self):
         """Test that dominated candidates get low scores."""

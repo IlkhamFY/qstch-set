@@ -1,0 +1,424 @@
+[
+  {
+    "problem": "zdt1",
+    "n_var": 30,
+    "n_obj": 2,
+    "n_total": 100,
+    "n_initial": 10,
+    "n_seeds": 5,
+    "ref_point": [
+      11.0,
+      11.0
+    ],
+    "methods": {
+      "STCH-qNParEGO": [
+        {
+          "seed": 0,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.08411526679992676,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 1,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.003041982650756836,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 2,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0035212039947509766,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 3,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.002517223358154297,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 4,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.001188516616821289,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        }
+      ],
+      "STCH-Set-qSR": [
+        {
+          "seed": 0,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0034711360931396484,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 1,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0022377967834472656,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 2,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.00388336181640625,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 3,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.001371622085571289,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 4,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0011849403381347656,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        }
+      ],
+      "Vanilla-qNParEGO": [
+        {
+          "seed": 0,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.001058816909790039,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 1,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0021543502807617188,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 2,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.002000093460083008,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 3,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.002510547637939453,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 4,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0021049976348876953,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        }
+      ],
+      "qLogEHVI": [
+        {
+          "seed": 0,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0020051002502441406,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 1,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.002761363983154297,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 2,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.001819610595703125,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 3,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0029630661010742188,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        },
+        {
+          "seed": 4,
+          "metrics_history": [],
+          "final_Y": [],
+          "time": 0.0010039806365966797,
+          "error": "to() received an invalid combination of arguments - got (torch.dtype, torch.device), but expected one of:\n * (torch.device device = None, torch.dtype dtype = None, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (torch.dtype dtype, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n * (Tensor tensor, bool non_blocking = False, bool copy = False, *, torch.memory_format memory_format = None)\n"
+        }
+      ],
+      "NSGA-II": [
+        {
+          "seed": 0,
+          "metrics_history": [
+            {
+              "hv": 97.62037405057453,
+              "igd": 1.7951521322055957,
+              "n_pareto": 8,
+              "spacing": 0.20422553473157293
+            }
+          ],
+          "final_Y": [
+            [
+              0.8658658982547208,
+              2.5288983358452284
+            ],
+            [
+              0.06194768005375817,
+              4.034898573992218
+            ],
+            [
+              0.7169420062351719,
+              2.7324370684106367
+            ],
+            [
+              0.061399326941263946,
+              4.818625657913908
+            ],
+            [
+              0.0627129520233457,
+              2.849418939567982
+            ],
+            [
+              0.906555499221179,
+              2.049364914682763
+            ],
+            [
+              0.0614256556390374,
+              4.455761284740769
+            ],
+            [
+              0.0027032138935026984,
+              4.858945329029934
+            ]
+          ],
+          "time": 0.13753867149353027
+        },
+        {
+          "seed": 1,
+          "metrics_history": [
+            {
+              "hv": 93.0603702208836,
+              "igd": 2.1830747086353015,
+              "n_pareto": 11,
+              "spacing": 0.20889197088295425
+            }
+          ],
+          "final_Y": [
+            [
+              0.01988013383979559,
+              4.233825994775669
+            ],
+            [
+              0.7640556872305679,
+              2.4779015844109433
+            ],
+            [
+              0.002259641729696338,
+              4.62976516394878
+            ],
+            [
+              0.4170403147256561,
+              2.950829850875952
+            ],
+            [
+              0.016493900618223423,
+              4.542764416146086
+            ],
+            [
+              0.013796710872592488,
+              4.6265881199552705
+            ],
+            [
+              0.0979383671234633,
+              4.117284849791112
+            ],
+            [
+              0.14008727285197742,
+              3.5902291971394953
+            ],
+            [
+              0.35918242002588485,
+              3.373073304536397
+            ],
+            [
+              0.14261055451686466,
+              3.4527327601697952
+            ],
+            [
+              0.37889153041281415,
+              3.1068871101551214
+            ]
+          ],
+          "time": 0.016796350479125977
+        },
+        {
+          "seed": 2,
+          "metrics_history": [
+            {
+              "hv": 93.97348410763945,
+              "igd": 2.0940572034333527,
+              "n_pareto": 9,
+              "spacing": 0.137251781758211
+            }
+          ],
+          "final_Y": [
+            [
+              0.021708898560271278,
+              4.092965843166531
+            ],
+            [
+              0.05363207789728061,
+              4.065993276383683
+            ],
+            [
+              0.38452981928894314,
+              3.205897880491833
+            ],
+            [
+              0.19450753692188816,
+              3.874692540189514
+            ],
+            [
+              0.20264905134772382,
+              3.2062603852505798
+            ],
+            [
+              0.4311494918818066,
+              2.9385647414452443
+            ],
+            [
+              0.7210730878749421,
+              2.392637981857913
+            ],
+            [
+              0.43599490214200376,
+              2.6259238218642698
+            ],
+            [
+              0.016243225046377596,
+              4.324681240405192
+            ]
+          ],
+          "time": 0.018108606338500977
+        },
+        {
+          "seed": 3,
+          "metrics_history": [
+            {
+              "hv": 96.44660914206186,
+              "igd": 1.9162051873679653,
+              "n_pareto": 10,
+              "spacing": 0.17428655589602443
+            }
+          ],
+          "final_Y": [
+            [
+              0.844961545790439,
+              2.691639463532925
+            ],
+            [
+              0.9631676519466653,
+              2.199178935274928
+            ],
+            [
+              0.0011210389574606294,
+              4.483901669145377
+            ],
+            [
+              0.10499475579119866,
+              3.090127699160354
+            ],
+            [
+              0.9587796538064041,
+              2.4903132164238513
+            ],
+            [
+              0.01118023283229691,
+              4.169476301696117
+            ],
+            [
+              0.99371199258639,
+              2.1534875374191946
+            ],
+            [
+              0.6158181053179512,
+              2.7218500101345247
+            ],
+            [
+              0.03643911093232613,
+              3.729167707908079
+            ],
+            [
+              0.001106045790293022,
+              4.727392539125563
+            ]
+          ],
+          "time": 0.020578384399414062
+        },
+        {
+          "seed": 4,
+          "metrics_history": [
+            {
+              "hv": 92.14267991667658,
+              "igd": 2.287647446799763,
+              "n_pareto": 9,
+              "spacing": 0.2614445583794989
+            }
+          ],
+          "final_Y": [
+            [
+              0.3203623392659608,
+              2.8121289982343836
+            ],
+            [
+              0.07311302662669392,
+              4.3090381936301325
+            ],
+            [
+              0.9758654812418275,
+              2.546864005383085
+            ],
+            [
+              0.025396027382849545,
+              4.444159437507932
+            ],
+            [
+              0.25463940549968456,
+              4.223211995505028
+            ],
+            [
+              0.021252331113091882,
+              4.9544966812204345
+            ],
+            [
+              0.3043772811986312,
+              3.2794430478041416
+            ],
+            [
+              0.03749188993971922,
+              4.34882969896956
+            ],
+            [
+              0.25742064922176977,
+              3.7163985448738868
+            ]
+          ],
+          "time": 0.018476009368896484
+        }
+      ]
+    }
+  }
+]

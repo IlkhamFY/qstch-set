@@ -70,7 +70,7 @@ class TestSTCHCandidateGenerator:
         assert weights.shape == (20, 2)
         # Check that weights sum to 1
         sums = weights.sum(axis=1)
-        assert torch.allclose(torch.tensor(sums), torch.ones(20), atol=1e-5)
+        assert torch.allclose(torch.tensor(sums, dtype=torch.float), torch.ones(20), atol=1e-5)
         # Check that all weights are positive
         assert (weights > 0).all()
 
