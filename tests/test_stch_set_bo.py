@@ -1,0 +1,201 @@
+"""Tests for qSTCHSet acquisition function."""
+
+import sys
+from pathlib import Path
+
+import pytest
+import torch
+from botorch.models import SingleTaskGP
+from botorch.models.transforms.outcome import Standardize
+from botorch.optim import optimize_acqf
+from botorch.sampling.normal import SobolQMCNormalSampler
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from stch_botorch.acquisition.stch_set_bo import qSTCHSet, qSTCHSetTS
+
+DTYPE = torch.double
+DEVICE = torch.device("cpu")
+
+
+def _make_model(d=4, m=3, n=15):
+    """Create a simple multi-output GP for testing."""
+    torch.manual_seed(42)
+    train_X = torch.rand(n, d, dtype=DTYPE, device=DEVICE)
+    train_Y = torch.rand(n, m, dtype=DTYPE, device=DEVICE)
+    model = SingleTaskGP(train_X, train_Y, outcome_transform=Standardize(m=m))
+    return model
+
+
+class TestqSTCHSet:
+    """Tests for qSTCHSet Monte Carlo acquisition function."""
+
+    def test_forward_shape(self):
+        """Test output shape for various batch sizes."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        acqf = qSTCHSet(model=model, ref_point=ref_point, mu=0.1)
+
+        # Single batch, q=3
+        X = torch.rand(1, 3, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([1])
+
+        # Multiple batches, q=5
+        X = torch.rand(7, 5, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([7])
+
+    def test_forward_differentiable(self):
+        """Test that gradients flow through the acquisition function."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        acqf = qSTCHSet(model=model, ref_point=ref_point, mu=0.1)
+
+        X = torch.rand(2, 3, 4, dtype=DTYPE, requires_grad=True)
+        val = acqf(X)
+        val.sum().backward()
+        assert X.grad is not None
+        assert not torch.isnan(X.grad).any()
+
+    def test_optimize_acqf(self):
+        """Test integration with BoTorch optimize_acqf."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        acqf = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([32])),
+        )
+
+        bounds = torch.stack([torch.zeros(4, dtype=DTYPE), torch.ones(4, dtype=DTYPE)])
+        candidates, value = optimize_acqf(
+            acq_function=acqf,
+            bounds=bounds,
+            q=3,
+            num_restarts=2,
+            raw_samples=16,
+        )
+        assert candidates.shape == torch.Size([3, 4])
+        assert value.dim() == 0  # scalar
+
+    def test_higher_q_better_coverage(self):
+        """More candidates should give better or equal coverage."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        acqf = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([64])),
+        )
+
+        torch.manual_seed(0)
+        # Same points, q=1 vs q=3 (q=3 includes q=1 point plus extras)
+        X1 = torch.rand(1, 1, 4, dtype=DTYPE)
+        X3 = torch.cat([X1, torch.rand(1, 2, 4, dtype=DTYPE)], dim=1)
+
+        val1 = acqf(X1).item()
+        val3 = acqf(X3).item()
+        # More points should give equal or better (higher) acquisition value
+        assert val3 >= val1 - 1e-3  # allow small numerical tolerance
+
+    def test_custom_weights(self):
+        """Test with non-uniform preference weights."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        weights = torch.tensor([0.7, 0.2, 0.1], dtype=DTYPE)
+        acqf = qSTCHSet(model=model, ref_point=ref_point, weights=weights, mu=0.1)
+
+        X = torch.rand(3, 2, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([3])
+        assert not torch.isnan(val).any()
+
+    def test_mu_sensitivity(self):
+        """Different mu values should give different but valid results."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        X = torch.rand(2, 3, 4, dtype=DTYPE)
+
+        vals = []
+        for mu in [0.01, 0.1, 1.0]:
+            acqf = qSTCHSet(
+                model=model,
+                ref_point=ref_point,
+                mu=mu,
+                sampler=SobolQMCNormalSampler(sample_shape=torch.Size([64])),
+            )
+            vals.append(acqf(X).detach())
+
+        # All should be finite
+        for v in vals:
+            assert torch.isfinite(v).all()
+
+        # Different mu should generally give different values
+        assert not torch.allclose(vals[0], vals[2], atol=1e-6)
+
+    def test_many_objectives(self):
+        """Test with m=10 objectives (our key use case)."""
+        model = _make_model(d=14, m=10, n=30)
+        ref_point = torch.zeros(10, dtype=DTYPE)
+        acqf = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([32])),
+        )
+
+        X = torch.rand(2, 5, 14, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([2])
+        assert torch.isfinite(val).all()
+
+    def test_maximize_flag(self):
+        """Test that maximize=False inverts the convention."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+
+        X = torch.rand(2, 3, 4, dtype=DTYPE)
+
+        acqf_max = qSTCHSet(
+            model=model, ref_point=ref_point, mu=0.1, maximize=True,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([64])),
+        )
+        acqf_min = qSTCHSet(
+            model=model, ref_point=ref_point, mu=0.1, maximize=False,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([64])),
+        )
+
+        val_max = acqf_max(X)
+        val_min = acqf_min(X)
+        # Should be different (negation changes the scalarization)
+        assert not torch.allclose(val_max, val_min, atol=1e-4)
+
+
+class TestqSTCHSetTS:
+    """Tests for Thompson Sampling variant."""
+
+    def test_forward_shape(self):
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        acqf = qSTCHSetTS(model=model, ref_point=ref_point, mu=0.1)
+
+        X = torch.rand(5, 3, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([5])
+
+    def test_resample(self):
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        acqf = qSTCHSetTS(model=model, ref_point=ref_point, mu=0.1)
+
+        X = torch.rand(2, 3, 4, dtype=DTYPE)
+        # Should not error
+        acqf.resample()
+        val = acqf(X)
+        assert torch.isfinite(val).all()
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--tb=short"])
