@@ -13,7 +13,7 @@ from stch_botorch.objectives import (
 )
 from stch_botorch.scalarization import smooth_chebyshev, smooth_chebyshev_set
 
-from stch_botorch.acquisition import qPMHI
+from stch_botorch.acquisition import qPMHI, qSTCHSet, qSTCHSetTS
 from stch_botorch.integration import (
     STCHCandidateGenerator,
     STCHqPMHIAcquisition,
@@ -27,6 +27,8 @@ __all__ = [
     "smooth_chebyshev",
     "smooth_chebyshev_set",
     "qPMHI",
+    "qSTCHSet",
+    "qSTCHSetTS",
     "STCHCandidateGenerator",
     "STCHqPMHIAcquisition",
     "optimize_stch_qpmhi",
