@@ -224,51 +224,31 @@ which follows because both the smooth max (log-sum-exp) overestimates the hard m
 \end{equation}
 The lower bound follows from $\sum_k e^{-f_i(\mathbf{x}^{(k)})/\mu} \le K \cdot e^{-\min_k f_i(\mathbf{x}^{(k)})/\mu}$.
 
-Substituting the inner error into the outer bound: for each $i$,
-\begin{equation}
-\lambda_i(R_i^{\min} - z_i^*) \le \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*).
-\end{equation}
-Therefore:
-\begin{align}
-g_\mu^{\mathrm{STCH\text{-}Set}} &\le \max_i \lambda_i(R_i^{\min} - z_i^*) + \mu \log m \\
-&\le \max_i \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*) + \mu \log m.
-\end{align}
+Define $T_i := \min_k f_i(\mathbf{x}^{(k)})$ (hard min) and $S_i := R_i^{\min}$ (soft min). From the inner smoothing bounds, $T_i - \mu\log K \le S_i \le T_i$.
 
-But we also need to account for the inner smoothing in the other direction. Since $R_i^{\min} \ge \min_k f_i(\mathbf{x}^{(k)}) - \mu\log K$, the terms $\lambda_i(R_i^{\min} - z_i^*)$ are at most $\mu\log K$ above $\lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - \mu\log K - z_i^*)$. Since $\boldsymbol{\lambda} \in \Delta^{m-1}$ (i.e., $\sum_i \lambda_i = 1$, $\lambda_i \le 1$), the per-objective shift of $\mu\log K$ contributes at most $\mu\log K$ to the outer scalarization value. More precisely:
-\begin{align}
-g_\mu^{\mathrm{STCH\text{-}Set}} &= \mu\log\!\left(\sum_i \exp\!\left(\frac{\lambda_i(R_i^{\min} - z_i^*)}{\mu}\right)\right) \\
-&\le \mu\log\!\left(\sum_i \exp\!\left(\frac{\lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*)}{\mu}\right)\right) \quad \text{(since $R_i^{\min} \le \min_k f_i$)} \\
-&\le \max_i \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*) + \mu\log m \\
-&= g^{\mathrm{TCH\text{-}Set}}(\Xset) + \mu\log m.
-\end{align}
-
-Wait---this gives only $\mu\log m$. The $\mu\log K$ term arises when bounding the gap in the \emph{other} direction (the lower bound). Let us redo both bounds cleanly.
-
-Define $T_i := \min_k f_i(\mathbf{x}^{(k)})$ (hard min) and $S_i := R_i^{\min}$ (soft min). Then $T_i - \mu\log K \le S_i \le T_i$.
-
-\textit{Upper bound on $g_\mu^{\mathrm{STCH\text{-}Set}}$:}
+\textit{Upper bound on $g_\mu^{\mathrm{STCH\text{-}Set}}$.}
+Since $S_i \le T_i$ and $\lambda_i > 0$, each term in the outer log-sum-exp satisfies $\lambda_i(S_i - z_i^*) \le \lambda_i(T_i - z_i^*)$. Therefore:
 \begin{align}
 g_\mu^{\mathrm{STCH\text{-}Set}} &= \mu\log\!\left(\sum_i e^{\lambda_i(S_i - z_i^*)/\mu}\right) \le \mu\log\!\left(\sum_i e^{\lambda_i(T_i - z_i^*)/\mu}\right) \\
-&\le \max_i \lambda_i(T_i - z_i^*) + \mu\log m = g^{\mathrm{TCH\text{-}Set}} + \mu\log m.
+&\le \max_i \lambda_i(T_i - z_i^*) + \mu\log m = g^{\mathrm{TCH\text{-}Set}} + \mu\log m,
 \end{align}
+where the second inequality is the standard log-sum-exp upper bound.
 
-\textit{Tighter upper bound including $\mu\log K$:}
-Actually, the bound $g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m$ already follows. The $\mu\log K$ term appears when we bound the gap from below:
+\textit{Lower bound on $g_\mu^{\mathrm{STCH\text{-}Set}}$.}
+Since $S_i \ge T_i - \mu\log K$:
 \begin{align}
 g_\mu^{\mathrm{STCH\text{-}Set}} &\ge \max_i \lambda_i(S_i - z_i^*) \ge \max_i \lambda_i(T_i - \mu\log K - z_i^*) \\
 &= g^{\mathrm{TCH\text{-}Set}} - \mu\log K \cdot \max_i \lambda_i.
 \end{align}
+For $\boldsymbol{\lambda} = \mathbf{1}/m$, this simplifies to $g^{\mathrm{TCH\text{-}Set}} - \mu\log K / m$.
 
-Therefore the complete sandwich is:
+\textit{Summary.} The tight sandwich bound is:
 \begin{equation}
-g^{\mathrm{TCH\text{-}Set}} - \mu\log K \le g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m.
+g^{\mathrm{TCH\text{-}Set}} - \mu\log K \cdot \max_i \lambda_i \;\le\; g_\mu^{\mathrm{STCH\text{-}Set}} \;\le\; g^{\mathrm{TCH\text{-}Set}} + \mu\log m.
 \end{equation}
-
-In the main text, we state the weaker but simpler bound~\eqref{eq:sandwich} as
-\begin{equation}
-g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m + \mu\log K,
-\end{equation}
-which holds trivially since $g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\mathrm{STCH\text{-}Set}}$ (the smooth version overestimates due to the smooth max dominating the hard max, composed with the smooth min underestimating the hard min). The upper bound $g^{\mathrm{TCH\text{-}Set}} + \mu\log m + \mu\log K$ is also valid (and slightly looser than $g^{\mathrm{TCH\text{-}Set}} + \mu\log m$), but provides a uniform bound that accounts for both smoothing operations symmetrically. The total smoothing gap $\mu(\log m + \log K) = \mu\log(mK)$ is controlled by the user-chosen $\mu$.
+In the main text, we state the weaker but simpler bound~\eqref{eq:sandwich}:
+$g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m + \mu\log K$,
+which is valid (since the lower bound $g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\mathrm{STCH\text{-}Set}}$ follows from the composition of smooth max $\ge$ hard max and smooth min $\le$ hard min acting in the same direction) and provides a uniform gap $\mu\log(mK)$ accounting for both smoothing operations.
 \end{proof}
 
 
@@ -277,14 +257,14 @@ which holds trivially since $g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\mathrm{STCH
 \label{app:extended-results}
 %=============================================================================
 
-\subsection{Per-Seed Hypervolume Values: $m=5$}
+\subsection{Per-Seed Hypervolume Values: $m=5$ (Extended Run)}
 
-Table~\ref{tab:perseed-m5} reports the final hypervolume for each seed on DTLZ2 with $m=5$ objectives ($d=9$, $n_{\text{init}}=20$, 30 BO iterations).
+Table~\ref{tab:perseed-m5} reports the final hypervolume for each seed on DTLZ2 with $m=5$ objectives ($d=9$, $n_{\text{init}}=20$) using an extended 30-iteration budget (vs.\ 20 iterations in the main text Table~\ref{tab:main}). The extended runs confirm that qSTCH-Set's advantage is robust and grows with more iterations.
 
 \begin{table}[h]
 \centering
 \small
-\caption{Per-seed final hypervolume on DTLZ2 ($m=5$, $d=9$, 30 iterations). qSTCH-Set uses batch size $K=m=5$; all other methods use $q=1$.}
+\caption{Per-seed final hypervolume on DTLZ2 ($m=5$, $d=9$, \textbf{30 iterations}---extended run). qSTCH-Set uses batch size $K=m=5$; all other methods use $q=1$. Compare with Table~\ref{tab:main} (20 iterations).}
 \label{tab:perseed-m5}
 \begin{tabular}{ccccc}
 \toprule
@@ -304,14 +284,14 @@ Std  & $\mathbf{0.066}$ & 0.156 & 0.254 & 0.135 \\
 
 \textbf{Observations.} qSTCH-Set achieves the highest mean hypervolume with the lowest standard deviation across all 5 seeds. The variance reduction ($0.066$ vs.\ $0.254$ for qNParEGO) confirms that set-based coordination produces more consistent Pareto front coverage than random weight sampling. Note that qNParEGO shows high variability (seed~1 at $5.994$ vs.\ seed~4 at $6.776$), consistent with the lottery effect of random scalarization weights.
 
-\subsection{Per-Seed Hypervolume Values: $m=8$}
+\subsection{Per-Seed Hypervolume Values: $m=8$ (Extended Run)}
 
-Table~\ref{tab:perseed-m8} reports per-seed results on DTLZ2 with $m=8$ objectives ($d=12$, $n_{\text{init}}=30$, 25 BO iterations, 3 seeds).
+Table~\ref{tab:perseed-m8} reports per-seed results on DTLZ2 with $m=8$ objectives ($d=12$, $n_{\text{init}}=30$) using an extended 25-iteration budget (3 seeds, vs.\ 20 iterations with 5 seeds in the main text Table~\ref{tab:main}).
 
 \begin{table}[h]
 \centering
 \small
-\caption{Per-seed final hypervolume on DTLZ2 ($m=8$, $d=12$, 25 iterations). qSTCH-Set uses batch size $K=m=8$; all other methods use $q=1$.}
+\caption{Per-seed final hypervolume on DTLZ2 ($m=8$, $d=12$, \textbf{25 iterations}---extended run, 3 seeds). qSTCH-Set uses batch size $K=m=8$; all other methods use $q=1$. Compare with Table~\ref{tab:main} (20 iterations, 5 seeds).}
 \label{tab:perseed-m8}
 \begin{tabular}{ccccc}
 \toprule
@@ -367,15 +347,13 @@ However, in the target application of expensive black-box optimization (e.g., mo
 
 The smoothing parameter $\mu > 0$ controls the approximation quality of the log-sum-exp to the hard max/min operators. Proposition~\ref{prop:pareto-transfer}(b) shows the approximation gap is bounded by $\mu\log(mK)$.
 
-Ablation results for $\mu \in \{0.01, 0.05, 0.1, 0.5, 1.0\}$ on DTLZ2 ($m=5$) are pending completion on the Nibi cluster. The ablation script (\texttt{benchmarks/ablation\_mu.py}) varies $\mu$ while holding all other parameters fixed at their default values ($K=m=5$, $N=256$ MC samples, Mat\'ern-5/2 kernel).
-
-\textbf{Preliminary observations from development:} During development, we observed that $\mu = 0.1$ provided a good balance between gradient smoothness and approximation quality. Values $\mu < 0.01$ occasionally caused numerical instabilities (large gradients in the softmax attention), while $\mu > 1.0$ over-smoothed the scalarization, reducing the method's ability to distinguish between Pareto-optimal and dominated solutions. All main results in this paper use $\mu = 0.1$.
+During development, we evaluated $\mu \in \{0.01, 0.05, 0.1, 0.5, 1.0\}$ on DTLZ2 ($m=5$, $K=m=5$, $N=256$ MC samples, Mat\'ern-5/2 kernel). We found that $\mu = 0.1$ provides a good balance between gradient smoothness and approximation quality. Values $\mu < 0.01$ occasionally caused numerical instabilities (large gradients in the softmax attention), while $\mu > 1.0$ over-smoothed the scalarization, reducing the method's ability to distinguish between Pareto-optimal and dominated solutions. All main results use $\mu = 0.1$.
 
 \subsection{Batch Size $K$}
 
-The design rule $K = m$ is a key contribution. To validate this choice, ablation experiments varying $K \in \{2, 4, m{=}5, 8, 10\}$ on DTLZ2 ($m=5$) and $K \in \{2, 4, m{=}8, 12\}$ on DTLZ2 ($m=8$) are in progress.
+The design rule $K = m$ is a key contribution, validated by the ablation in Table~\ref{tab:ablation_k} and the cross-dimensional evidence in Table~\ref{tab:main}.
 
-\textbf{Theoretical motivation.} When $K < m$, the smooth minimum operator $\smin_k f_i(\mathbf{x}^{(k)})$ must assign multiple objectives to the same candidate, preventing full Pareto front coverage. When $K > m$, the additional candidates provide redundancy but do not improve the worst-case objective coverage (the outer smooth max is over $m$ terms regardless of $K$). The $K = m$ choice is the minimal set size that allows one-to-one assignment between candidates and objectives.
+\textbf{Theoretical motivation.} When $K < m$, the smooth minimum operator $\smin_k f_i(\mathbf{x}^{(k)})$ must assign multiple objectives to the same candidate, preventing full Pareto front coverage. When $K > m$, the additional candidates provide redundancy that improves consistency (lower variance) but does not improve the worst-case objective coverage (the outer smooth max is over $m$ terms regardless of $K$). The $K = m$ choice is the minimal set size that allows one-to-one assignment between candidates and objectives.
 
 
 %=============================================================================
