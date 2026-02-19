@@ -9,13 +9,12 @@ Fixes from v1:
   - Increased num_restarts/raw_samples for high-m
   - 5 seeds minimum for statistical significance
   - Detailed JSON output with per-seed, per-iteration data
+  - Parallel execution for seeds
+  - Warm-starting for STCH-Set
 
 Usage:
     python dtlz_benchmark_v2.py --problem DTLZ2 --m 5 --seeds 5 --iters 30
     python dtlz_benchmark_v2.py --problem DTLZ2 --m 5 --seeds 5 --ablation k
-    python dtlz_benchmark_v2.py --problem DTLZ2 --m 5 --seeds 5 --ablation mu
-    python dtlz_benchmark_v2.py --problem DTLZ2 --m 8 --seeds 3 --skip-qehvi
-    python dtlz_benchmark_v2.py --problem ZDT2 --m 2 --seeds 3
 """
 
 import argparse
@@ -28,6 +27,7 @@ import traceback
 import warnings
 from datetime import datetime
 from pathlib import Path
+from multiprocessing import Pool, cpu_count, current_process
 
 import numpy as np
 import torch
@@ -50,10 +50,12 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 
 warnings.filterwarnings("ignore")
 
+# Adjust path to include src
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from stch_botorch.acquisition.stch_set_bo import qSTCHSet
 from stch_botorch.scalarization import smooth_chebyshev
 
+# Global default, but will be set per process
 tkwargs = {"dtype": torch.double, "device": torch.device("cpu")}
 
 
@@ -61,24 +63,31 @@ tkwargs = {"dtype": torch.double, "device": torch.device("cpu")}
 # Problem setup
 # ---------------------------------------------------------------------------
 
-def get_problem(name: str, m: int):
+def get_problem(name: str, m: int, device=None):
     """Get test problem, input dim, and reference point."""
+    if device is None:
+        device = tkwargs["device"]
+    kwargs = {"dtype": torch.double, "device": device}
+    
     if name == "DTLZ2":
         d = m + 1  # d = m + k - 1, k=2
         problem = DTLZ2(num_objectives=m, dim=d, negate=True)
-        ref_point = torch.full((m,), -1.5, **tkwargs)
+        problem.to(**kwargs)
+        ref_point = torch.full((m,), -1.5, **kwargs)
     elif name == "ZDT2":
         assert m == 2, "ZDT2 is bi-objective"
         from botorch.test_functions.multi_objective import ZDT2 as ZDT2Func
         d = 30
         problem = ZDT2Func(num_objectives=2, dim=d, negate=True)
-        ref_point = torch.tensor([-11.0, -11.0], **tkwargs)
+        problem.to(**kwargs)
+        ref_point = torch.tensor([-11.0, -11.0], **kwargs)
     elif name == "ZDT3":
         assert m == 2, "ZDT3 is bi-objective"
         from botorch.test_functions.multi_objective import ZDT3 as ZDT3Func
         d = 30
         problem = ZDT3Func(num_objectives=2, dim=d, negate=True)
-        ref_point = torch.tensor([-11.0, -11.0], **tkwargs)
+        problem.to(**kwargs)
+        ref_point = torch.tensor([-11.0, -11.0], **kwargs)
     else:
         raise ValueError(f"Unknown problem: {name}")
     return problem, d, ref_point
@@ -100,13 +109,22 @@ def get_opt_params(m: int):
 # Shared utilities
 # ---------------------------------------------------------------------------
 
-def get_initial_data(problem, d, n_init, seed):
+def get_initial_data(problem, d, n_init, seed, device):
     """Generate initial Sobol samples with a specific seed."""
+    kwargs = {"dtype": torch.double, "device": device}
+    # Temporarily set CPU for sampling if needed, or just direct
+    # draw_sobol_samples handles device
+    bounds = torch.stack([torch.zeros(d, **kwargs), torch.ones(d, **kwargs)])
+    
+    # Seeding
+    # Note: torch.manual_seed sets the seed for the current device.
     torch.manual_seed(seed)
+    
     train_X = draw_sobol_samples(
-        bounds=torch.stack([torch.zeros(d, **tkwargs), torch.ones(d, **tkwargs)]),
+        bounds=bounds,
         n=n_init,
         q=1,
+        seed=seed 
     ).squeeze(1)
     train_Y = problem(train_X)
     return train_X, train_Y
@@ -144,21 +162,23 @@ def compute_hv(train_Y, ref_point):
 # Method runners
 # ---------------------------------------------------------------------------
 
-def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1):
-    """Run STCH-Set-BO with q candidates optimized jointly.
+def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1, warm_start=True, device=None):
+    """Run STCH-Set-BO with q candidates optimized jointly."""
+    if device is None: device = tkwargs["device"]
+    kwargs = {"dtype": torch.double, "device": device}
     
-    CRITICAL: q here IS the set size K. The whole point of STCH-Set is
-    jointly optimizing K candidates. With q=1 it degenerates to single-point.
-    """
     torch.manual_seed(seed)
     np.random.seed(seed)
     opt = get_opt_params(m)
 
-    bounds = torch.stack([torch.zeros(d, **tkwargs), torch.ones(d, **tkwargs)])
-    train_X, train_Y = get_initial_data(problem, d, n_init, seed)
+    bounds = torch.stack([torch.zeros(d, **kwargs), torch.ones(d, **kwargs)])
+    train_X, train_Y = get_initial_data(problem, d, n_init, seed, device)
     hv_history = [compute_hv(train_Y, ref_point)]
     times = []
     errors = []
+    
+    # Warm-start state
+    prev_candidates = None
 
     for i in range(n_iters):
         t0 = time.time()
@@ -173,6 +193,25 @@ def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1):
                 maximize=True,
             )
 
+            # Prepare initial conditions for warm-start
+            batch_initial_conditions = None
+            if warm_start and prev_candidates is not None:
+                # optimize_acqf expects batch_initial_conditions of shape (num_restarts, q, d)
+                # We use prev_candidates (q, d) as one restart, and generate others randomly
+                num_restarts = opt["num_restarts"]
+                if num_restarts > 1:
+                    # Generate random restarts
+                    raw_random = torch.rand(num_restarts - 1, q, d, **kwargs)
+                    # Scale to bounds
+                    raw_random = bounds[0] + (bounds[1] - bounds[0]) * raw_random
+                    # Prepend previous solution
+                    batch_initial_conditions = torch.cat([
+                        prev_candidates.unsqueeze(0),
+                        raw_random
+                    ], dim=0)
+                else:
+                    batch_initial_conditions = prev_candidates.unsqueeze(0)
+
             candidates, acq_value = optimize_acqf(
                 acq_function=acqf,
                 bounds=bounds,
@@ -180,37 +219,44 @@ def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1):
                 num_restarts=opt["num_restarts"],
                 raw_samples=opt["raw_samples"],
                 options={"batch_limit": 5, "maxiter": opt["maxiter"]},
+                batch_initial_conditions=batch_initial_conditions
             )
+
+            # Store for next iteration
+            prev_candidates = candidates.detach().clone()
 
             new_Y = problem(candidates)
             train_X = torch.cat([train_X, candidates])
             train_Y = torch.cat([train_Y, new_Y])
         except Exception as e:
             errors.append({"iter": i, "error": str(e)})
-            print(f"  STCH-Set iter {i} failed: {e}")
-            candidates = torch.rand(q, d, **tkwargs)
+            # print(f"  STCH-Set iter {i} failed: {e}")
+            candidates = torch.rand(q, d, **kwargs)
             new_Y = problem(candidates)
             train_X = torch.cat([train_X, candidates])
             train_Y = torch.cat([train_Y, new_Y])
+            prev_candidates = None # Reset warm start on failure
 
         t1 = time.time()
         hv = compute_hv(train_Y, ref_point)
         hv_history.append(hv)
         times.append(t1 - t0)
 
-        print(f"  STCH-Set(q={q},mu={mu}) iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s", flush=True)
+        # print(f"  STCH-Set(q={q},mu={mu}) iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s", flush=True)
 
     return hv_history, times, errors
 
 
-def run_qnparego(problem, d, m, ref_point, n_init, n_iters, q, seed):
-    """Run qNParEGO with FIXED API: GenericMCObjective wrapper."""
+def run_qnparego(problem, d, m, ref_point, n_init, n_iters, q, seed, device=None):
+    if device is None: device = tkwargs["device"]
+    kwargs = {"dtype": torch.double, "device": device}
+    
     torch.manual_seed(seed)
     np.random.seed(seed)
     opt = get_opt_params(m)
 
-    bounds = torch.stack([torch.zeros(d, **tkwargs), torch.ones(d, **tkwargs)])
-    train_X, train_Y = get_initial_data(problem, d, n_init, seed)
+    bounds = torch.stack([torch.zeros(d, **kwargs), torch.ones(d, **kwargs)])
+    train_X, train_Y = get_initial_data(problem, d, n_init, seed, device)
     hv_history = [compute_hv(train_Y, ref_point)]
     times = []
     errors = []
@@ -220,13 +266,9 @@ def run_qnparego(problem, d, m, ref_point, n_init, n_iters, q, seed):
         try:
             model = fit_model(train_X, train_Y)
 
-            # Random Chebyshev weights
-            weights = torch.rand(m, **tkwargs)
+            weights = torch.rand(m, **kwargs)
             weights = weights / weights.sum()
 
-            # FIX: get_chebyshev_scalarization returns a callable(Y, X=None)
-            # but qLogNoisyExpectedImprovement.objective must be an
-            # MCAcquisitionObjective. Wrap it in GenericMCObjective.
             chebyshev_fn = get_chebyshev_scalarization(weights=weights, Y=train_Y)
             objective = GenericMCObjective(chebyshev_fn)
 
@@ -252,8 +294,7 @@ def run_qnparego(problem, d, m, ref_point, n_init, n_iters, q, seed):
             train_Y = torch.cat([train_Y, new_Y])
         except Exception as e:
             errors.append({"iter": i, "error": str(e)})
-            print(f"  qNParEGO iter {i} failed: {e}")
-            candidates = torch.rand(q, d, **tkwargs)
+            candidates = torch.rand(q, d, **kwargs)
             new_Y = problem(candidates)
             train_X = torch.cat([train_X, candidates])
             train_Y = torch.cat([train_Y, new_Y])
@@ -263,20 +304,19 @@ def run_qnparego(problem, d, m, ref_point, n_init, n_iters, q, seed):
         hv_history.append(hv)
         times.append(t1 - t0)
 
-        if (i + 1) % 5 == 0:
-            print(f"  qNParEGO iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s")
-
     return hv_history, times, errors
 
 
-def run_stch_nparego(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1):
-    """Run STCH-NParEGO (single-point STCH scalarization + qNEI)."""
+def run_stch_nparego(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1, device=None):
+    if device is None: device = tkwargs["device"]
+    kwargs = {"dtype": torch.double, "device": device}
+    
     torch.manual_seed(seed)
     np.random.seed(seed)
     opt = get_opt_params(m)
 
-    bounds = torch.stack([torch.zeros(d, **tkwargs), torch.ones(d, **tkwargs)])
-    train_X, train_Y = get_initial_data(problem, d, n_init, seed)
+    bounds = torch.stack([torch.zeros(d, **kwargs), torch.ones(d, **kwargs)])
+    train_X, train_Y = get_initial_data(problem, d, n_init, seed, device)
     hv_history = [compute_hv(train_Y, ref_point)]
     times = []
     errors = []
@@ -286,11 +326,10 @@ def run_stch_nparego(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1)
         try:
             model = fit_model(train_X, train_Y)
 
-            weights = torch.rand(m, **tkwargs)
+            weights = torch.rand(m, **kwargs)
             weights = weights / weights.sum()
 
             def make_stch_objective(w, rp, mu_val):
-                """Create a closure to avoid late-binding issues."""
                 def obj_fn(samples, X=None):
                     return smooth_chebyshev(Y=samples, weights=w, ref_point=rp, mu=mu_val)
                 return obj_fn
@@ -319,8 +358,7 @@ def run_stch_nparego(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1)
             train_Y = torch.cat([train_Y, new_Y])
         except Exception as e:
             errors.append({"iter": i, "error": str(e)})
-            print(f"  STCH-NParEGO iter {i} failed: {e}")
-            candidates = torch.rand(q, d, **tkwargs)
+            candidates = torch.rand(q, d, **kwargs)
             new_Y = problem(candidates)
             train_X = torch.cat([train_X, candidates])
             train_Y = torch.cat([train_Y, new_Y])
@@ -330,20 +368,19 @@ def run_stch_nparego(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1)
         hv_history.append(hv)
         times.append(t1 - t0)
 
-        if (i + 1) % 5 == 0:
-            print(f"  STCH-NParEGO iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s")
-
     return hv_history, times, errors
 
 
-def run_qehvi(problem, d, m, ref_point, n_init, n_iters, q, seed):
-    """Run qEHVI. Exponential in m, skip for m>6."""
+def run_qehvi(problem, d, m, ref_point, n_init, n_iters, q, seed, device=None):
+    if device is None: device = tkwargs["device"]
+    kwargs = {"dtype": torch.double, "device": device}
+    
     torch.manual_seed(seed)
     np.random.seed(seed)
     opt = get_opt_params(m)
 
-    bounds = torch.stack([torch.zeros(d, **tkwargs), torch.ones(d, **tkwargs)])
-    train_X, train_Y = get_initial_data(problem, d, n_init, seed)
+    bounds = torch.stack([torch.zeros(d, **kwargs), torch.ones(d, **kwargs)])
+    train_X, train_Y = get_initial_data(problem, d, n_init, seed, device)
     hv_history = [compute_hv(train_Y, ref_point)]
     times = []
     errors = []
@@ -375,8 +412,7 @@ def run_qehvi(problem, d, m, ref_point, n_init, n_iters, q, seed):
             train_Y = torch.cat([train_Y, new_Y])
         except Exception as e:
             errors.append({"iter": i, "error": str(e)})
-            print(f"  qEHVI iter {i} failed: {e}")
-            candidates = torch.rand(q, d, **tkwargs)
+            candidates = torch.rand(q, d, **kwargs)
             new_Y = problem(candidates)
             train_X = torch.cat([train_X, candidates])
             train_Y = torch.cat([train_Y, new_Y])
@@ -386,24 +422,23 @@ def run_qehvi(problem, d, m, ref_point, n_init, n_iters, q, seed):
         hv_history.append(hv)
         times.append(t1 - t0)
 
-        if (i + 1) % 5 == 0:
-            print(f"  qEHVI iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s")
-
     return hv_history, times, errors
 
 
-def run_random(problem, d, m, ref_point, n_init, n_iters, q, seed):
-    """Random baseline."""
+def run_random(problem, d, m, ref_point, n_init, n_iters, q, seed, device=None):
+    if device is None: device = tkwargs["device"]
+    kwargs = {"dtype": torch.double, "device": device}
+    
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    train_X, train_Y = get_initial_data(problem, d, n_init, seed)
+    train_X, train_Y = get_initial_data(problem, d, n_init, seed, device)
     hv_history = [compute_hv(train_Y, ref_point)]
     times = []
 
     for i in range(n_iters):
         t0 = time.time()
-        candidates = torch.rand(q, d, **tkwargs)
+        candidates = torch.rand(q, d, **kwargs)
         new_Y = problem(candidates)
         train_X = torch.cat([train_X, candidates])
         train_Y = torch.cat([train_Y, new_Y])
@@ -413,6 +448,59 @@ def run_random(problem, d, m, ref_point, n_init, n_iters, q, seed):
 
     return hv_history, times, []
 
+# ---------------------------------------------------------------------------
+# Worker Function
+# ---------------------------------------------------------------------------
+
+def worker_run_method(kwargs):
+    """Worker function to run a single seed of a method."""
+    method_name = kwargs["method_name"]
+    seed = kwargs["seed"]
+    problem_name = kwargs["problem_name"]
+    m = kwargs["m"]
+    d = kwargs["d"]
+    n_init = kwargs["n_init"]
+    n_iters = kwargs["n_iters"]
+    device_str = kwargs["device"]
+    
+    # Configure device
+    if device_str == "cuda" and torch.cuda.is_available():
+        # Simple round-robin or just use default
+        # If we have multiple GPUs, we could map process to GPU
+        n_gpus = torch.cuda.device_count()
+        # process name usually 'SpawnPoolWorker-1', etc.
+        # But this is brittle. Just use cuda:0 if not specified.
+        # Or just use the default device which will be picked up
+        device = torch.device("cuda:0")
+    else:
+        device = torch.device("cpu")
+        
+    # Re-instantiate problem and ref_point on correct device
+    problem, _, ref_point = get_problem(problem_name, m, device=device)
+    
+    # Run
+    if method_name.startswith("stch_set"):
+        return run_stch_set_bo(
+            problem, d, m, ref_point, n_init, n_iters, kwargs["K"], seed, kwargs["mu"], device=device
+        )
+    elif method_name == "stch_nparego":
+        return run_stch_nparego(
+            problem, d, m, ref_point, n_init, n_iters, kwargs["q"], seed, kwargs["mu"], device=device
+        )
+    elif method_name == "qnparego":
+        return run_qnparego(
+            problem, d, m, ref_point, n_init, n_iters, kwargs["q"], seed, device=device
+        )
+    elif method_name == "qehvi":
+        return run_qehvi(
+            problem, d, m, ref_point, n_init, n_iters, kwargs["q"], seed, device=device
+        )
+    elif method_name == "random":
+        return run_random(
+            problem, d, m, ref_point, n_init, n_iters, kwargs["q"], seed, device=device
+        )
+    else:
+        raise ValueError(f"Unknown method: {method_name}")
 
 # ---------------------------------------------------------------------------
 # Main
@@ -440,21 +528,22 @@ def main():
     parser.add_argument("--output-dir", default=None, help="Directory for output (overrides --output)")
     parser.add_argument("--seed-offset", type=int, default=0, help="Offset for seed range (for SLURM array jobs)")
     parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"], help="Device for torch tensors")
+    parser.add_argument("--n-workers", type=int, default=None, help="Number of parallel workers (defaults to min(seeds, 4))")
     args = parser.parse_args()
 
-    # Device setup
-    if args.device == "cuda" and torch.cuda.is_available():
-        torch.set_default_device("cuda")
-        print(f"Using CUDA: {torch.cuda.get_device_name(0)}")
-    elif args.device == "cuda":
-        print("WARNING: CUDA requested but not available, falling back to CPU")
+    # Device info
+    print(f"Requested device: {args.device}")
+    if args.device == "cuda" and not torch.cuda.is_available():
+         print("WARNING: CUDA requested but not available. Falling back to CPU.")
+         args.device = "cpu"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     print(f"DTLZ Benchmark v2: {args.problem} m={args.m}, seeds={args.seeds}, "
           f"iters={args.iters}, K={args.K}, mu={args.mu}")
     print(f"Ablation: {args.ablation}, seed_offset={args.seed_offset}")
 
-    problem, d, ref_point = get_problem(args.problem, args.m)
+    # Dummy call to get d
+    _, d, _ = get_problem(args.problem, args.m, device=torch.device("cpu"))
     n_init = 2 * (d + 1)
     print(f"Input dim: {d}, Initial points: {n_init}\n")
 
@@ -480,84 +569,104 @@ def main():
     }
 
     # -----------------------------------------------------------------------
-    # Build method configs
+    # Build configurations
     # -----------------------------------------------------------------------
-    method_configs = []
+    configs_to_run = [] # List of dicts
 
     if args.ablation in ("k", "both"):
-        # K ablation for STCH-Set
         for K in [3, 5, 10]:
-            method_configs.append({
-                "name": f"stch_set_K{K}",
-                "fn": lambda s, K=K: run_stch_set_bo(
-                    problem, d, args.m, ref_point, n_init, args.iters, K, s, args.mu
-                ),
+            configs_to_run.append({
+                "method_name": f"stch_set_K{K}",
+                "real_method": "stch_set",
+                "K": K,
+                "mu": args.mu
             })
     
     if args.ablation in ("mu", "both"):
-        # mu ablation for STCH-Set
         for mu_val in [0.01, 0.1, 0.5, 1.0]:
-            method_configs.append({
-                "name": f"stch_set_mu{mu_val}",
-                "fn": lambda s, mu=mu_val: run_stch_set_bo(
-                    problem, d, args.m, ref_point, n_init, args.iters, args.K, s, mu
-                ),
+            configs_to_run.append({
+                "method_name": f"stch_set_mu{mu_val}",
+                "real_method": "stch_set",
+                "K": args.K,
+                "mu": mu_val
             })
 
     if args.ablation == "none":
-        # Standard comparison
-        fn_map = {
-            "stch_set": lambda s: run_stch_set_bo(
-                problem, d, args.m, ref_point, n_init, args.iters, args.K, s, args.mu
-            ),
-            "stch_nparego": lambda s: run_stch_nparego(
-                problem, d, args.m, ref_point, n_init, args.iters, args.q, s, args.mu
-            ),
-            "qnparego": lambda s: run_qnparego(
-                problem, d, args.m, ref_point, n_init, args.iters, args.q, s
-            ),
-            "qehvi": lambda s: run_qehvi(
-                problem, d, args.m, ref_point, n_init, args.iters, args.q, s
-            ),
-            "random": lambda s: run_random(
-                problem, d, args.m, ref_point, n_init, args.iters, args.q, s
-            ),
-        }
         for method_name in args.methods:
-            if method_name in fn_map:
-                method_configs.append({"name": method_name, "fn": fn_map[method_name]})
+            configs_to_run.append({
+                "method_name": method_name,
+                "real_method": method_name if method_name != "stch_set" else "stch_set", # handle naming
+                "K": args.K,
+                "mu": args.mu,
+                "q": args.q
+            })
+            
+    # Clean up "real_method" which was internal helper
+    # The worker expects "method_name" to be passed through for results, 
+    # but we need to pass enough info to know what to run.
+    # Actually, let's just make the worker kwargs complete.
 
     # -----------------------------------------------------------------------
     # Run experiments
     # -----------------------------------------------------------------------
-    for cfg in method_configs:
-        name = cfg["name"]
+    
+    n_workers = args.n_workers if args.n_workers is not None else min(args.seeds, 4)
+    print(f"Parallel execution with {n_workers} workers.")
+
+    for cfg in configs_to_run:
+        display_name = cfg["method_name"]
         print(f"\n{'='*60}")
-        print(f"Running {name}")
+        print(f"Running {display_name}")
         print(f"{'='*60}")
+
+        # Prepare tasks
+        tasks = []
+        for seed_idx in range(args.seeds):
+            seed = seed_idx + args.seed_offset
+            
+            task_kwargs = {
+                "method_name": cfg.get("real_method", display_name), # e.g. "stch_set"
+                "seed": seed,
+                "problem_name": args.problem,
+                "m": args.m,
+                "d": d,
+                "n_init": n_init,
+                "n_iters": args.iters,
+                "device": args.device,
+                "K": cfg.get("K", args.K),
+                "mu": cfg.get("mu", args.mu),
+                "q": cfg.get("q", args.q)
+            }
+            # Special handling for ablation names mapping back to real methods
+            if "stch_set" in display_name and "K" in display_name:
+                 task_kwargs["method_name"] = "stch_set"
+            if "stch_set" in display_name and "mu" in display_name:
+                 task_kwargs["method_name"] = "stch_set"
+                 
+            tasks.append(task_kwargs)
 
         all_hv = []
         all_times = []
         all_errors = []
 
-        for seed_idx in range(args.seeds):
-            seed = seed_idx + args.seed_offset
-            print(f"\n  Seed {seed} (idx {seed_idx+1}/{args.seeds})")
-            try:
-                hv_history, times, errors = cfg["fn"](seed)
-                all_hv.append(hv_history)
-                all_times.append(times)
-                all_errors.append(errors)
-                print(f"  Final HV: {hv_history[-1]:.4f}, errors: {len(errors)}")
-            except Exception as e:
-                print(f"  FAILED: {e}")
-                traceback.print_exc()
+        # Run parallel
+        with Pool(processes=n_workers) as pool:
+            # We map the worker over tasks
+            # worker_run_method returns (hv_history, times, errors)
+            results_list = pool.map(worker_run_method, tasks)
+            
+        for res in results_list:
+            hv_history, times, errors = res
+            all_hv.append(hv_history)
+            all_times.append(times)
+            all_errors.append(errors)
+            # print(f"  Final HV: {hv_history[-1]:.4f}")
 
         if all_hv:
             hv_array = np.array(all_hv)
             time_array = np.array(all_times)
 
-            results["methods"][name] = {
+            results["methods"][display_name] = {
                 "hv_mean": hv_array.mean(axis=0).tolist(),
                 "hv_std": hv_array.std(axis=0).tolist(),
                 "hv_all": hv_array.tolist(),
@@ -569,7 +678,7 @@ def main():
                 "errors": all_errors,
             }
 
-            print(f"\n  {name}: HV={hv_array[:,-1].mean():.4f}"
+            print(f"\n  {display_name}: HV={hv_array[:,-1].mean():.4f}"
                   f"±{hv_array[:,-1].std():.4f}, "
                   f"avg time={time_array.mean():.1f}s/iter, "
                   f"errors={sum(len(e) for e in all_errors)}")
