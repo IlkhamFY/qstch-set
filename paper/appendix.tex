@@ -268,14 +268,25 @@ The $K$-ablation (Table~\ref{tab:ablation_k}) and scaling experiments reveal tha
 \paragraph{3. Benchmark scope.}
 All scaling experiments use DTLZ2, which has a known convex Pareto front (the positive orthant of a unit hypersphere). Convex fronts are favorable for scalarization methods because every Pareto-optimal point can be found by some weight vector $\boldsymbol{\lambda}$. On problems with non-convex or disconnected Pareto fronts (e.g., DTLZ7, WFG4), scalarization methods may miss concave regions entirely. Extending to such benchmarks---and to real-world problems where Pareto front geometry is unknown a priori---is necessary to validate the generality of qSTCH-Set.
 
-\paragraph{4. Theory gap: $K > 1$ consistency is conjectured.}
-Conjecture~\ref{conj:consistency} states that qSTCH-Set converges to the true Pareto front as observations grow, with an $\varepsilon_t$-optimality gap of $\mu_t\log(mK) + O(\beta_t^{1/2}\bar{\sigma}_t) \to 0$. For $K{=}1$, this follows from composite BO consistency~\citep{astudillo2019composite}. For $K > 1$, the set-valued optimization introduces permutation symmetries and joint-input dependencies that break the existing proof framework. A rigorous proof likely requires set-valued epi-convergence arguments, which we leave as the primary open theoretical problem.
+\paragraph{4. Theory gap: $K > 1$ consistency is unproven.}
+Remark~\ref{conj:consistency} discusses empirical evidence that qSTCH-Set converges to the true Pareto front as observations grow. For $K{=}1$, consistency follows from composite BO results~\citep{astudillo2019composite}. For $K > 1$, the set-valued optimization introduces permutation symmetries and joint-input dependencies that break the existing proof framework. A rigorous proof likely requires set-valued epi-convergence arguments, which we leave as the primary open theoretical problem.
 
 \paragraph{5. Acquisition optimization is non-convex.}
 The qSTCH-Set acquisition landscape over $\Xset \in \X^K$ has dimension $K \cdot d$ (e.g., $10 \times 14 = 140$ at $m{=}10$, $d{=}14$). L-BFGS-B with 20 random restarts provides no global optimality guarantee for this non-convex problem. While this limitation is shared by all BO methods that use gradient-based acquisition optimization, the higher dimensionality of the joint candidate space ($Kd$ vs.\ $d$ for single-point methods) may exacerbate the issue. Evolutionary or hybrid acquisition optimizers could mitigate this.
 
 \paragraph{6. Statistical power.}
 The $m{=}10$ results for the $K{=}m{=}10$ comparison are based on 3~seeds. While the effect size is large (6.5\%, with non-overlapping $\pm 1\sigma$ intervals), full statistical validation with $\ge 10$ seeds is needed for publication-quality claims. A separate 5-seed run at $m{=}10$ with default $K$ confirms the ordering (qSTCH-Set $45.45 \pm 1.83$ vs qNParEGO $45.59 \pm 1.45$), but the $K{=}m$ advantage is only visible with $K{=}10$.
+
+%=============================================================================
+\section{Budget-Matched Comparisons}
+\label{app:budget-matched}
+%=============================================================================
+
+To isolate the benefit of set-based coordination from raw evaluation count, we compare qSTCH-Set ($K{=}m$, 20 iterations, $Km$ total evaluations) against qNParEGO with batch size $q{=}m$ (20 iterations, $Km$ total evaluations via sequential greedy batching). Both methods use the same total function evaluation budget.
+
+\placeholder{TABLE: Budget-matched results --- qNParEGO $q{=}m$ vs qSTCH-Set, same total evaluations. Experiments in progress on Nibi cluster.}
+
+This comparison is critical for disentangling two sources of qSTCH-Set's advantage: (1)~the raw benefit of evaluating $m$ points per iteration (which any batch method could exploit), and (2)~the coordination benefit of jointly optimizing the batch via the smooth minimax formulation (which is unique to qSTCH-Set). We expect qSTCH-Set to retain an advantage due to (2), but the magnitude may be smaller than the 6.5\% reported in Table~\ref{tab:main}.
 
 %=============================================================================
 \section{Extended Experimental Results}
@@ -377,6 +388,31 @@ At $m=8$, the cost increases to $335.6$s/iter, reflecting the $O(Nm^2)$ complexi
 
 However, in the target application of expensive black-box optimization (e.g., molecular simulations, wet-lab assays), function evaluation costs typically dominate ($\sim$minutes to hours per evaluation), making the $\sim$6 min/iter acquisition cost negligible.
 
+\subsection{Scaling Projection}
+
+Table~\ref{tab:timing-projection} extrapolates wall-clock time to larger $m$ based on the observed $O(Nm^2)$ scaling.
+
+\begin{table}[h]
+\caption{Projected per-iteration wall-clock time for qSTCH-Set on H100 GPU, extrapolated from observed $O(Nm^2)$ scaling. For $m \ge 20$, acquisition optimization dominates; function evaluations (expensive chemistry assays, minutes--hours each) remain the bottleneck in practice.}
+\label{tab:timing-projection}
+\centering
+\begin{tabular}{lccc}
+\toprule
+$m$ & $K=m$ & Observed/Projected time/iter & Total acq.\ overhead (20 iters) \\
+\midrule
+5  & 5  & 23s (observed)  & 7.7 min \\
+8  & 8  & 336s (observed) & 1.9 hr \\
+10 & 10 & $\sim$800s (projected) & $\sim$4.4 hr \\
+20 & 20 & $\sim$3200s (projected) & $\sim$18 hr \\
+50 & 50 & $\sim$20000s (projected) & $\sim$5.6 days \\
+\bottomrule
+\end{tabular}
+\vspace{2pt}
+{\footnotesize Projection assumes $O(Nm^2)$ scaling from $m=5$ and $m=8$ observations. For $m \ge 20$, parallelizing across multiple GPUs or using MIG partitions reduces wall time proportionally. For expensive black-box functions (assay cost $\gg$ 1 hour), acquisition overhead at $m \le 20$ is negligible.}
+\end{table}
+
+For $m = 50$, the projected $\sim$5.6 days of acquisition overhead per 20-iteration run is impractical on a single GPU. Two practical mitigations exist: (a)~distributing the $N$ MC samples across multiple GPUs reduces wall time proportionally (near-linear speedup since samples are independent), or (b)~fixing $K$ at a manageable size (e.g., $K = 10 \ll m = 50$) and accepting partial Pareto front coverage as a practical fallback. The latter trades coordination quality for computational feasibility, and our ablation suggests that even $K < m$ provides meaningful improvements over single-point methods.
+
 
 %=============================================================================
 \section{Hyperparameter Sensitivity}
@@ -393,7 +429,7 @@ During development, we evaluated $\mu \in \{0.01, 0.05, 0.1, 0.5, 1.0\}$ on DTLZ
 
 The design rule $K = m$ is a key contribution, validated by the ablation in Table~\ref{tab:ablation_k} and the cross-dimensional evidence in Table~\ref{tab:main}.
 
-\textbf{Theoretical motivation.} When $K < m$, the smooth minimum operator $\smin_k f_i(\mathbf{x}^{(k)})$ must assign multiple objectives to the same candidate, preventing full Pareto front coverage. When $K > m$, the additional candidates provide redundancy that improves consistency (lower variance) but does not improve the worst-case objective coverage (the outer smooth max is over $m$ terms regardless of $K$). The $K = m$ choice is the minimal set size that allows one-to-one assignment between candidates and objectives.
+\textbf{Rationale.} When $K < m$, the smooth minimum operator $\smin_k f_i(\mathbf{x}^{(k)})$ must assign multiple objectives to the same candidate, preventing full Pareto front coverage. When $K > m$, the additional candidates provide redundancy that improves consistency (lower variance) and can yield higher mean HV (Table~\ref{tab:ablation_k}: $K{=}10 > K{=}5{=}m$ at $m{=}5$), but at proportionally higher per-iteration cost ($O(NKm)$). The $K{=}m$ choice is the \emph{minimum} set size that allows one-to-one assignment between candidates and objectives---a practical lower bound, not a mathematical optimum.
 
 
 %=============================================================================

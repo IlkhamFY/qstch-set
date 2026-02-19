@@ -7,8 +7,8 @@
 \label{sec:theory}
 
 We establish the theoretical properties of qSTCH-Set as a BO acquisition function.
-We distinguish between results proved rigorously (Propositions~\ref{prop:valid}--\ref{prop:pareto-transfer})
-and those that remain conjectural (Conjecture~\ref{conj:consistency}).
+We present rigorous results (Propositions~\ref{prop:valid}--\ref{prop:pareto-transfer})
+and discuss empirical consistency (Remark~\ref{conj:consistency}), leaving the formal $K > 1$ proof as future work.
 Throughout, $\X \subset \R^d$ is compact and $f_1,\ldots,f_m:\X\to\R$ are the true (unknown) objectives.
 
 %--------------------------------------------------------------------
@@ -131,22 +131,21 @@ so solutions converge in scalarization value to the true TCH-Set optimum.
 \end{corollary}
 
 %--------------------------------------------------------------------
-\subsection{Conjecture 3: Consistency Under GP Posterior Convergence}
+\subsection{Empirical Consistency Under GP Posterior Convergence}
 \label{sec:theory-conj}
 %--------------------------------------------------------------------
 
-\begin{conjecture}[Consistency of qSTCH-Set BO]
+\begin{remark}[Empirical consistency of qSTCH-Set BO]
 \label{conj:consistency}
-Under standard GP regularity assumptions, as $t\to\infty$, with probability $\ge 1-\delta$,
-every $\mathbf{x}^{(k)}\in\Xset_t^*$ is $\varepsilon_t$-Pareto optimal for the true objectives,
-where $\varepsilon_t = \mu_t\log(mK) + O(\beta_t^{1/2}\bar{\sigma}_t) \to 0$.
-\end{conjecture}
-
-\paragraph{Supporting arguments.} Three ingredients support this conjecture:
-(1)~\textbf{GP posterior concentration}~\cite{srinivas2010ucb}: with high probability, $|f_i(\mathbf{x})-\mu_i^{(t)}(\mathbf{x})|\le\beta_t^{1/2}\sigma_i^{(t)}(\mathbf{x})\to 0$ as the model concentrates.
-(2)~\textbf{Lipschitz stability} of STCH-Set in the objective values transfers posterior errors to scalarization errors at rate $O(\beta_t^{1/2}\bar{\sigma}_t)$.
-(3)~For $K{=}1$, the conjecture is proved by the composite BO consistency result of \cite{astudillo2019composite}.
-For $K{>}1$, the set-valued optimization introduces permutation symmetries requiring set-valued epi-convergence arguments (Rockafellar \& Wets, Ch.~7) that remain open.
+Empirically, qSTCH-Set solutions converge toward the Pareto front as the number of BO iterations increases (Figures~\ref{fig:convergence_m5}--\ref{fig:convergence_m8} and Appendix~\ref{app:extended}).
+Three ingredients support a formal consistency argument---that every $\mathbf{x}^{(k)}\in\Xset_t^*$ becomes $\varepsilon_t$-Pareto optimal with $\varepsilon_t \to 0$:
+\begin{enumerate}
+    \item \textbf{GP posterior concentration}~\cite{srinivas2010ucb}: with high probability, $|f_i(\mathbf{x})-\mu_i^{(t)}(\mathbf{x})|\le\beta_t^{1/2}\sigma_i^{(t)}(\mathbf{x})\to 0$ as the model concentrates.
+    \item \textbf{Lipschitz stability} of STCH-Set in the objective values transfers posterior errors to scalarization errors at rate $O(\beta_t^{1/2}\bar{\sigma}_t)$.
+    \item For $K{=}1$, consistency is proved by the composite BO result of \cite{astudillo2019composite}. For $K{>}1$, the set-valued optimization introduces permutation symmetries requiring set-valued epi-convergence arguments (Rockafellar \& Wets, Ch.~7) that remain open.
+\end{enumerate}
+We leave the formal proof for $K > 1$ as future work.
+\end{remark}
 
 %--------------------------------------------------------------------
 \subsection{Computational Complexity}

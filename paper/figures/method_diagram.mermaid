@@ -1,0 +1,33 @@
+graph LR
+    subgraph Input
+    D[Data D_t] --> GP[GP Posterior]
+    end
+
+    subgraph "qSTCH-Set Acquisition (Joint Optimization)"
+    direction TB
+    GP --> S1[Sample f_1]
+    GP --> S2[Sample f_2]
+    GP --> S3[Sample f_S]
+    
+    W[Weight Set Λ] --> STCH1
+    W --> STCH2
+    W --> STCH3
+
+    S1 --> STCH1[STCH Scalarization]
+    S2 --> STCH2[STCH Scalarization]
+    S3 --> STCH3[STCH Scalarization]
+    
+    STCH1 --> SUM((Sum))
+    STCH2 --> SUM
+    STCH3 --> SUM
+    
+    SUM --> GRAD[Gradient Ascent]
+    end
+
+    subgraph Output
+    GRAD --> B[Batch X_{t+1}]
+    end
+
+    style Input fill:#f9f,stroke:#333,stroke-width:2px
+    style Output fill:#f9f,stroke:#333,stroke-width:2px
+    style GRAD fill:#bbf,stroke:#333,stroke-width:2px
