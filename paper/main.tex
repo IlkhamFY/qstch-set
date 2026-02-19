@@ -67,10 +67,11 @@
 %=============================================================================
 \begin{abstract}
 %=============================================================================
-Multi-objective Bayesian optimization (MOBO) enables sample-efficient optimization of expensive black-box functions, but existing methods scale poorly beyond five objectives: hypervolume-based approaches incur exponential cost in $m$, while scalarization methods produce uncoordinated solutions via random weight vectors.
-We introduce \textbf{qSTCH-Set}, a Monte Carlo acquisition function that applies smooth Tchebycheff set (STCH-Set) scalarization---recently proposed for gradient-based many-objective optimization---to Gaussian process posterior samples, jointly optimizing $K$ candidates to collectively cover $m$ objectives at $O(Km)$ cost.
-We prove that the Pareto optimality guarantees of STCH-Set transfer to the Bayesian optimization setting asymptotically under GP posterior concentration, with an explicit approximation gap of $\mu\log(mK) + O(\beta_t^{1/2}\bar{\sigma}_t)$.
-On DTLZ2 with $m{=}5$ objectives (5 seeds, 30 iterations), qSTCH-Set achieves a hypervolume of $6.646 \pm 0.066$, outperforming both qNParEGO ($6.429 \pm 0.254$) and single-point STCH ($6.117 \pm 0.156$), demonstrating that set-based coordination improves Pareto front coverage in the sample-efficient regime.
+Multi-objective Bayesian optimization (MOBO) scales poorly beyond five objectives: hypervolume-based acquisition functions incur exponential cost in the number of objectives~$m$, while scalarization methods produce uncoordinated batches via random weight vectors.
+Set-based smooth Tchebycheff (STCH-Set) scalarization addresses this in gradient-based optimization, and single-point STCH has been adapted to BO, but no method combines set-based coordination with sample-efficient surrogate-driven search.
+We introduce qSTCH-Set, a Monte Carlo acquisition function that jointly optimizes $K$ candidates via STCH-Set scalarization over Gaussian process posterior samples at $O(Km)$ cost, with the design rule $K{=}m$ allocating one candidate per objective.
+On DTLZ2 with $m{=}5$ objectives, qSTCH-Set achieves hypervolume $6.646 \pm 0.066$, outperforming both qNParEGO ($6.429 \pm 0.254$) and single-point STCH ($6.117 \pm 0.156$); at $m{=}8$ the advantage widens to 11\%, empirically validating the $K{=}m$ rule.
+qSTCH-Set fills a fundamental gap in many-objective Bayesian optimization, enabling coordinated Pareto front coverage in regimes where hypervolume-based methods are computationally intractable.
 \end{abstract}
 
 %=============================================================================
@@ -78,28 +79,24 @@ On DTLZ2 with $m{=}5$ objectives (5 seeds, 30 iterations), qSTCH-Set achieves a 
 \label{sec:intro}
 %=============================================================================
 
-Many engineering and scientific optimization problems involve multiple conflicting objectives. In drug discovery, a candidate molecule must simultaneously satisfy constraints on potency, selectivity, metabolic stability, permeability, and toxicity---often 20--50 ADMET endpoints~\citep{knowles2006parego}. In materials design, one seeks alloys balancing strength, weight, cost, and corrosion resistance. Multi-objective Bayesian optimization (MOBO) addresses such problems when function evaluations are expensive, using Gaussian process (GP) surrogates and acquisition functions to efficiently explore the Pareto front~\citep{daulton2020qnehvi,daulton2021qnehvi,balandat2020botorch}.
+Many real-world optimization problems require balancing a large number of conflicting objectives simultaneously.
+In drug discovery, a candidate molecule must satisfy constraints on potency, selectivity, metabolic stability, permeability, and toxicity---routinely $m{=}20$--$50$ ADMET endpoints~\citep{knowles2006parego}.
+In materials design, one seeks alloys balancing strength, weight, cost, and corrosion resistance.
+When function evaluations are expensive---requiring physical experiments, molecular simulations, or costly assays---multi-objective Bayesian optimization (MOBO) provides a principled, sample-efficient framework that fits Gaussian process (GP) surrogates to observed data and uses acquisition functions to guide evaluation~\citep{balandat2020botorch}.
 
-However, existing MOBO methods face a fundamental scaling barrier in the number of objectives $m$:
+However, existing MOBO methods face a fundamental scaling barrier in the number of objectives~$m$.
+Hypervolume-based acquisition functions---the gold standard for $m \le 4$---rely on non-dominated partitioning of the objective space, which is \#P-hard in~$m$~\citep{daulton2020qnehvi,daulton2021qnehvi,wang2024pohvi}.
+Scalarization methods such as ParEGO and qNParEGO~\citep{knowles2006parego,daulton2020qnehvi} decompose the problem via random Chebyshev weight vectors, scaling gracefully in~$m$ but producing uncoordinated solutions: each batch element optimizes an independently sampled weight with no mechanism to ensure collective Pareto front coverage.
+Information-theoretic approaches (MESMO, PFES, JES)~\citep{belakaria2019mesmo,suzuki2020pfes,tu2022jes} face similar degradation as Pareto front sampling costs grow with~$m$.
 
-\begin{itemize}
-    \item \textbf{Hypervolume-based methods} (qEHVI, qNEHVI)~\citep{daulton2020qnehvi,daulton2021qnehvi} are state-of-the-art for $m \le 4$ but rely on non-dominated partitioning, which is \#P-hard in $m$~\citep{wang2024pohvi}.
-    \item \textbf{Scalarization methods} (ParEGO, qNParEGO)~\citep{knowles2006parego,daulton2020qnehvi} decompose the problem via random Chebyshev weights. They scale better in $m$ but use a non-smooth $\max$ operator and produce uncoordinated solutions---each batch element optimizes an independently sampled weight vector with no mechanism to ensure collective Pareto front coverage.
-    \item \textbf{Information-theoretic methods} (MESMO, PFES, JES)~\citep{belakaria2019mesmo,suzuki2020pfes,tu2022jes} approximate entropy computations that degrade rapidly beyond $m \approx 4$.
-\end{itemize}
-
-Recently, two independent lines of work have made partial progress toward scalable multi-objective scalarization:
-
-\textbf{(1) Smooth Tchebycheff (STCH) scalarization for gradient-based MOO.}
-Lin et al.~\citep{lin2024smooth} introduced a log-sum-exp relaxation of the Tchebycheff scalarization that is everywhere differentiable, preserves Pareto optimality guarantees, and achieves $O(1/\epsilon)$ convergence. Lin et al.~\citep{lin2025few} extended this to \emph{STCH-Set}, a ``few-for-many'' formulation where $K$ solutions are jointly optimized to cover $m$ objectives via a smooth minimax scalarization, with all $K$ solutions guaranteed weakly Pareto optimal. Crucially, STCH-Set scales as $O(Km)$---linear in both solutions and objectives---and has been demonstrated with up to $m{=}1{,}024$ objectives and $K{=}20$ solutions. However, both methods require cheap, differentiable objectives.
-
-\textbf{(2) Smooth scalarization in Bayesian optimization.}
-Pires \& Coelho~\citep{pires2025stch} combined single-point STCH with composite Bayesian optimization~\citep{astudillo2019composite}, achieving a smooth scalarization within the BO loop. However, their method finds only one solution per optimization---there is no set-based coordination.
-
-This reveals a clear gap in the landscape (Table~\ref{tab:gap}):
+Two recent lines of work have made partial progress toward scalable many-objective scalarization.
+Lin et al.~\citep{lin2024smooth} introduced smooth Tchebycheff (STCH) scalarization, a log-sum-exp relaxation of the non-smooth Chebyshev scalarization that is everywhere differentiable and preserves Pareto optimality guarantees.
+They extended this to STCH-Set~\citep{lin2025few}, where $K$ solutions are jointly optimized via a smooth minimax formulation to collectively cover~$m$ objectives at $O(Km)$ cost, demonstrating scaling to $m{=}1{,}024$ objectives in gradient-based optimization with cheap, differentiable objectives.
+Independently, Pires \& Coelho~\citep{pires2025stch} adapted single-point STCH to composite Bayesian optimization~\citep{astudillo2019composite}, achieving smooth scalarization within the BO loop but without set-based coordination.
+This leaves a clear gap in the landscape (Table~\ref{tab:gap}): no method applies set-based smooth Tchebycheff scalarization to sample-efficient Bayesian optimization of expensive black-box functions.
 
 \begin{table}[t]
-\caption{Positioning of qSTCH-Set in the scalarization--optimization landscape. Set-based smooth Tchebycheff scalarization has been applied to gradient-based optimization (Lin et al., ICLR 2025) and single-point smooth Tchebycheff to Bayesian optimization (Pires \& Coelho, 2025). We fill the remaining cell: set-based smooth Tchebycheff for sample-efficient Bayesian optimization of expensive black-box functions.}
+\caption{Positioning of qSTCH-Set in the scalarization--optimization landscape. Set-based STCH has been applied to gradient-based optimization~\citep{lin2025few} and single-point STCH to Bayesian optimization~\citep{pires2025stch}. We fill the remaining cell.}
 \label{tab:gap}
 \centering
 \small
@@ -113,11 +110,14 @@ Bayesian optimization (expensive $f$) & Pires \& Coelho~\citep{pires2025stch} & 
 \end{tabular}
 \end{table}
 
+We fill this gap with \textbf{qSTCH-Set}, a Monte Carlo acquisition function that evaluates a candidate set by applying the STCH-Set minimax scalarization to GP posterior samples, enabling coordinated multi-solution acquisition for many-objective BO.
+Our key design rule sets $K{=}m$: one candidate per objective, so that the smooth minimum operator assigns each candidate to a distinct objective direction, expanding the Pareto front along all axes simultaneously.
+
 \paragraph{Contributions.}
 \begin{enumerate}
-    \item We propose \textbf{qSTCH-Set}, the first Monte Carlo acquisition function that applies set-based smooth Tchebycheff scalarization to GP posterior samples, enabling coordinated multi-solution acquisition for many-objective BO (\S\ref{sec:method}).
-    \item We prove that the Pareto optimality guarantees of STCH-Set transfer asymptotically to the BO setting under GP posterior concentration, with an explicit approximation gap decomposition (\S\ref{sec:theory}).
-    \item On DTLZ2 with $m{=}5$ objectives, qSTCH-Set achieves HV $6.646 \pm 0.066$, significantly outperforming both qNParEGO ($6.429 \pm 0.254$) and single-point STCH-NParEGO ($6.117 \pm 0.156$) (\S\ref{sec:experiments}).
+    \item We propose \textbf{qSTCH-Set}, the first Monte Carlo acquisition function that applies set-based smooth Tchebycheff scalarization to GP posterior samples for many-objective Bayesian optimization (\S\ref{sec:method}).
+    \item We prove that STCH-Set Pareto optimality guarantees transfer asymptotically under GP posterior concentration, with an explicit approximation gap of $\mu\log(mK) + O(\beta_t^{1/2}\bar{\sigma}_t)$ (\S\ref{sec:theory}).
+    \item On DTLZ2, qSTCH-Set outperforms qNParEGO and single-point STCH at both $m{=}5$ and $m{=}8$ objectives, with the advantage widening at higher~$m$ (\S\ref{sec:experiments}).
     \item We release an open-source BoTorch implementation as a drop-in \texttt{MCAcquisitionFunction} (\S\ref{app:implementation}).
 \end{enumerate}
 
@@ -321,22 +321,34 @@ On ZDT2 ($m=2$), STCH-NParEGO achieves HV $107.2 \pm 4.1$, slightly outperformin
 %=============================================================================
 
 \paragraph{Hypervolume-based MOBO.}
-qEHVI and qNEHVI~\citep{daulton2020qnehvi,daulton2021qnehvi} optimize expected hypervolume improvement and are state-of-the-art for $m \le 4$. However, the non-dominated partitioning step is \#P-hard in $m$. $\varepsilon$-PoHVI~\citep{wang2024pohvi} provides exact posterior integration but remains limited to small $m$.
+Expected hypervolume improvement (EHVI) and its Monte Carlo extensions qEHVI and qNEHVI~\citep{daulton2020qnehvi,daulton2021qnehvi} define the state of the art for multi-objective BO with $m \le 4$ objectives, optimizing the expected improvement in the dominated hypervolume indicator.
+However, exact hypervolume computation requires non-dominated partitioning, which is \#P-hard in~$m$~\citep{wang2024pohvi}.
+Recent work on $\varepsilon$-PoHVI~\citep{wang2024pohvi} provides exact posterior hypervolume integration but remains limited to small~$m$.
+For $m > 5$, these methods become computationally intractable.
 
 \paragraph{Scalarization-based MOBO.}
-ParEGO~\citep{knowles2006parego} pioneered random Chebyshev scalarization for MOBO. qNParEGO~\citep{daulton2020qnehvi} extended it to batches via sequential greedy selection. Paria et al.~\citep{paria2019mobo} provided regret analysis for random scalarization. MOBO-OSD~\citep{mobo_osd2025} selects batch points via orthogonal search directions but was tested only up to $m = 6$. All use non-smooth operators and/or uncoordinated weight selection.
+ParEGO~\citep{knowles2006parego} pioneered random Chebyshev scalarization for MOBO, converting the multi-objective problem to a sequence of single-objective subproblems via randomly sampled weight vectors.
+qNParEGO~\citep{daulton2020qnehvi} extended this to batches via sequential greedy selection, and Paria et al.~\citep{paria2019mobo} provided regret analysis for random scalarization.
+MOBO-OSD~\citep{mobo_osd2025} selects batch points via orthogonal search directions.
+All these methods rely on uncoordinated weight selection: each batch element optimizes an independently sampled weight with no mechanism to ensure collective Pareto front coverage.
+For $m \gg 5$, random weights concentrate in the interior of the simplex, failing to sample the extremal directions needed for comprehensive front coverage.
 
-\paragraph{Information-theoretic MOBO.}
-MESMO~\citep{belakaria2019mesmo}, PFES~\citep{suzuki2020pfes}, and JES~\citep{tu2022jes} use entropy-based acquisitions but face the same $m$-scaling barrier due to Pareto front sampling costs.
-
-\paragraph{High-dimensional MOBO.}
-MORBO~\citep{daulton2022morbo} scales to high-dimensional \emph{input} spaces ($d > 100$) via local trust regions but was tested with only $m \le 4$ objectives. It is orthogonal to our contribution, which scales the number of objectives.
+\paragraph{Set-based and information-theoretic approaches.}
+Set-based acquisition functions optimize the joint utility $U(\{x_1, \ldots, x_q\})$ of a batch rather than a sum of individual utilities.
+qEHVI is the canonical example, jointly maximizing expected hypervolume improvement, but inherits the exponential scaling of hypervolume computation.
+Information-theoretic methods---MESMO~\citep{belakaria2019mesmo}, PFES~\citep{suzuki2020pfes}, and JES~\citep{tu2022jes}---approximate entropy-based acquisitions but face similar degradation as Pareto front sampling costs grow with~$m$.
+MORBO~\citep{daulton2022morbo} scales to high-dimensional \emph{input} spaces ($d > 100$) via local trust regions but addresses input dimensionality rather than objective dimensionality, and was primarily evaluated with $m \le 4$ objectives.
 
 \paragraph{Smooth Tchebycheff scalarization.}
-Lin et al.~\citep{lin2024smooth} introduced STCH for gradient-based MOO with $O(1/\epsilon)$ convergence and Pareto optimality guarantees. Lin et al.~\citep{lin2025few} extended to STCH-Set for the ``few-for-many'' setting, scaling to $m = 1{,}024$ objectives with $K \le 20$ solutions. Both require cheap, differentiable objectives. Pires \& Coelho~\citep{pires2025stch} combined single-point STCH with composite BO~\citep{astudillo2019composite}, achieving smooth scalarization in BO but without set-based coordination.
+Lin et al.~\citep{lin2024smooth} introduced the smooth Tchebycheff (STCH) scalarization, replacing the non-smooth $\max$ in classical Chebyshev with a log-sum-exp approximation that is everywhere differentiable, has Lipschitz gradients, and preserves (weak) Pareto optimality.
+They proved $O(1/\epsilon)$ convergence for gradient-based multi-objective optimization.
+Lin et al.~\citep{lin2025few} extended this to STCH-Set, a ``few-for-many'' formulation where $K$ solutions are jointly optimized to cover~$m$ objectives via a nested smooth minimax, scaling as $O(Km)$ and demonstrating results with up to $m{=}1{,}024$ objectives and $K{=}20$ solutions.
+However, both methods require cheap, differentiable objectives.
+Pires \& Coelho~\citep{pires2025stch} brought single-point STCH into composite Bayesian optimization~\citep{astudillo2019composite}, achieving smooth scalarization in the surrogate-driven loop but without set-based coordination.
+Our qSTCH-Set completes this picture: it combines set-based STCH scalarization with Monte Carlo GP posterior sampling, operating at $O(Km)$ cost in the sample-efficient regime where objectives are expensive black-box functions.
 
 \paragraph{Many-objective evolutionary optimization.}
-NSGA-III~\citep{deb2014nsga3} and MOEA/D~\citep{zhang2007moead} handle many objectives but require thousands of evaluations, making them unsuitable for expensive black-box problems.
+Evolutionary algorithms such as NSGA-III~\citep{deb2014nsga3} and MOEA/D~\citep{zhang2007moead} handle many objectives effectively but typically require thousands of function evaluations, making them unsuitable for expensive black-box problems where each evaluation may cost hours or days.
 
 %=============================================================================
 \section{Limitations and Future Work}
