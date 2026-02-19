@@ -384,75 +384,8 @@ We introduced qSTCH-Set, a Monte Carlo acquisition function that brings set-base
 \bibliography{references}
 
 %=============================================================================
-% APPENDIX
+% APPENDIX (external file)
 %=============================================================================
-\newpage
-\appendix
-
-\section{Proof of Proposition~\ref{prop:gap}}
-\label{app:proof}
-
-\begin{proof}
-The bound decomposes into three additive terms via the triangle inequality.
-
-\textbf{Step 1: Outer smoothing gap.} By Proposition~3.4 of~\citet{lin2024smooth}, for any set-objective vector $\tilde{\mathbf{f}}$:
-\begin{equation}
-    \max_{i} \left\{\lambda_i(\tilde{f}_i - z_i^*)\right\} \le \mu \log\!\left(\sum_i \exp\!\left(\frac{\lambda_i(\tilde{f}_i - z_i^*)}{\mu}\right)\right) \le \max_i\left\{\lambda_i(\tilde{f}_i - z_i^*)\right\} + \mu\log m.
-\end{equation}
-
-\textbf{Step 2: Inner smoothing gap.} For each objective $i$, the smooth minimum satisfies:
-\begin{equation}
-    \min_k f_i(\mathbf{x}^{(k)}) - \mu\log K \le \smin_k f_i(\mathbf{x}^{(k)}) \le \min_k f_i(\mathbf{x}^{(k)}).
-\end{equation}
-Since $\boldsymbol{\lambda} \in \Delta^{m-1}$, this contributes at most $\mu\log K$ through the outer scalarization.
-
-\textbf{Step 3: Posterior uncertainty.} Under the GP concentration event (probability $\ge 1 - \delta$), for all $\mathbf{x} \in \X$ and $i \in [m]$:
-\begin{equation}
-    |f_i(\mathbf{x}) - \mu_{i,t}(\mathbf{x})| \le \beta_t^{1/2}\,\sigma_{i,t}(\mathbf{x}).
-\end{equation}
-The STCH-Set objective is Lipschitz in the objective values. The TCH-Set value (max operator) has Lipschitz constant 1 in each objective coordinate, giving an additive error at most $2\beta_t^{1/2}\bar{\sigma}_t$ (factor of 2 from applying concentration at both the solution set and any comparator set).
-
-Combining Steps 1--3 yields Eq.~\eqref{eq:gap}. \qed
-\end{proof}
-
-\section{Implementation Details}
-\label{app:implementation}
-
-\paragraph{BoTorch integration.} qSTCH-Set is implemented as a subclass of \texttt{MCAcquisitionFunction} in BoTorch~\citep{balandat2020botorch}. The STCH-Set scalarization operates on posterior sample tensors of shape $(\text{num\_samples} \times \text{batch} \times q \times m)$. The full implementation is approximately 200 lines of PyTorch code.
-
-\paragraph{Acquisition optimization.} We use L-BFGS-B with 20 random restarts and 512 raw Sobol candidates for initialization, following BoTorch defaults. All $q$ candidates are optimized jointly (not via sequential greedy).
-
-\paragraph{GP fitting.} Independent single-task GPs with Mat\'ern-5/2 kernels and constant mean functions. Hyperparameters optimized via marginal likelihood maximization using L-BFGS-B with 5 random restarts.
-
-\paragraph{Numerical stability.} The nested log-sum-exp can cause overflow for large $|f_i(\mathbf{x}^{(k)})|/\mu$. We implement the standard log-sum-exp trick: subtracting the maximum value inside each $\exp$ before summing. Outputs are standardized before scalarization to keep values in a numerically stable range.
-
-\section{Extended Results}
-\label{app:extended}
-
-\paragraph{Per-seed breakdown ($m = 5$).} Individual seed results for the main experiment:
-
-\begin{table}[h]
-\centering
-\small
-\caption{Per-seed final hypervolume on DTLZ2 ($m = 5$, $d = 9$, 30 iterations).}
-\begin{tabular}{ccccc}
-\toprule
-Seed & qSTCH-Set & STCH-NParEGO & qNParEGO & Random \\
-\midrule
-0 & 6.760 & 6.343 & 6.525 & 5.442 \\
-1 & 6.615 & 6.158 & 5.994 & 5.382 \\
-2 & 6.643 & 6.140 & 6.465 & 5.199 \\
-3 & 6.559 & 5.857 & 6.387 & 5.250 \\
-4 & 6.653 & 6.089 & 6.776 & 5.575 \\
-\midrule
-Mean & \textbf{6.646} & 6.117 & 6.429 & 5.370 \\
-Std & 0.066 & 0.156 & 0.254 & 0.135 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Convergence dynamics.} qSTCH-Set reaches near-final HV values by iteration 15--20, while qNParEGO and STCH-NParEGO continue to improve more gradually. This is consistent with the set-based acquisition strategy: each iteration contributes $K = 5$ coordinated points, so fewer iterations suffice for coverage.
-
-\placeholder{Full convergence curves and wall-clock timing comparisons will be added after GPU experiments on DTLZ2 with $m \in \{8, 10\}$.}
+\input{appendix}
 
 \end{document}

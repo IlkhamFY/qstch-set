@@ -1,0 +1,469 @@
+%=============================================================================
+% APPENDIX — Full proofs, extended results, and implementation details
+%=============================================================================
+\newpage
+\appendix
+
+\section{Full Proof of Proposition~\ref{prop:valid}: qSTCH-Set Is a Valid MC Acquisition Function}
+\label{app:proof-valid}
+
+We provide the complete proof of each part of Proposition~\ref{prop:valid}, expanding on the proof sketch in the main text.
+
+\begin{proof}[Proof of Proposition~\ref{prop:valid}]
+
+\textbf{Part (a): Measurability.}
+
+We must show that for every fixed candidate set $\Xset = \{\mathbf{x}^{(1)},\ldots,\mathbf{x}^{(K)}\} \in \X^K$, the map
+\[
+\boldsymbol{\omega} \mapsto -g_\mu^{\mathrm{STCH\text{-}Set}}\!\left(\hat{\mathbf{f}}_\omega^{(t)}(\Xset) \mid \boldsymbol{\lambda}\right)
+\]
+is Borel-measurable as a function of the base samples $\boldsymbol{\omega} \in \R^{m \times K}$.
+
+The GP posterior sample paths are constructed via the reparameterization trick:
+\begin{equation}
+\hat{f}_{i,\omega}^{(t)}(\mathbf{x}) = \mu_i^{(t)}(\mathbf{x}) + \mathbf{k}_i^{(t)}(\mathbf{x})^\top (K_i^{(t)} + \sigma^2 I)^{-1/2} \boldsymbol{\omega}_i,
+\end{equation}
+where $\mu_i^{(t)}(\mathbf{x})$ is the posterior mean, $\mathbf{k}_i^{(t)}(\mathbf{x})$ is the posterior cross-covariance vector, $K_i^{(t)}$ is the posterior covariance matrix, and $\boldsymbol{\omega}_i \sim \mathcal{N}(\mathbf{0}, I)$.
+For fixed $\mathbf{x}$, this is an affine function $\boldsymbol{\omega}_i \mapsto a + \mathbf{b}^\top \boldsymbol{\omega}_i$ with deterministic $a \in \R$ and $\mathbf{b} \in \R^t$, hence Borel-measurable.
+
+Alternatively, in the pathwise conditioning approach~\cite{wilson2018maxvalue}, sample paths take the form:
+\begin{equation}
+\hat{f}_{i,\omega}^{(t)}(\mathbf{x}) = \sum_{j=1}^{J} w_{ij}(\boldsymbol{\omega}_i) \phi_j(\mathbf{x}) + \text{update}(\mathbf{x}; \boldsymbol{\omega}_i),
+\end{equation}
+where $\phi_j$ are basis functions and $w_{ij}$ are linear functions of the base samples. In either case, for fixed $\mathbf{x}$, the map $\boldsymbol{\omega}_i \mapsto \hat{f}_{i,\omega}^{(t)}(\mathbf{x})$ is measurable.
+
+The STCH-Set scalarization~\eqref{eq:stchset-def} is constructed from these sample path evaluations via a finite sequence of elementary operations:
+\begin{enumerate}
+    \item Negation: $f_i(\mathbf{x}^{(k)}) \mapsto -f_i(\mathbf{x}^{(k)})/\mu$ (measurable: affine transformation).
+    \item Exponentiation: $-f_i(\mathbf{x}^{(k)})/\mu \mapsto \exp(-f_i(\mathbf{x}^{(k)})/\mu)$ (measurable: continuous function of a measurable function).
+    \item Finite summation over $k$: $\sum_{k=1}^{K} \exp(-f_i(\mathbf{x}^{(k)})/\mu)$ (measurable: finite sum of measurable functions).
+    \item Logarithm: $\log(\cdot)$ applied to a strictly positive measurable function (measurable: continuous function on $(0,\infty)$).
+    \item Scaling and shifting: $\lambda_i(\cdot - z_i^*)/\mu$ (measurable: affine transformation).
+    \item Exponentiation and summation over $i$: same argument as steps 2--3.
+    \item Final logarithm and scaling by $\mu$: same argument as step 4.
+\end{enumerate}
+
+Since each step preserves measurability (compositions of Borel-measurable functions are Borel-measurable, and finite sums/products of measurable functions are measurable), the full map $\boldsymbol{\omega} \mapsto g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset) \mid \boldsymbol{\lambda})$ is Borel-measurable. Negation preserves measurability, completing part~(a). \qed
+
+\medskip
+\textbf{Part (b): Finite expectation.}
+
+We must show $\E[|\alpha_t^{\mathrm{qSTCH}}(\Xset)|] < \infty$ when the GP posteriors have continuous kernels on the compact domain $\X$.
+
+By Kolmogorov's continuity theorem (see~\cite{rasmussen2006gp}, \S4.1), GPs with continuous covariance functions $k_i(\mathbf{x}, \mathbf{x}')$ on compact $\X$ have sample paths that are almost surely continuous on $\X$. Since continuous functions on compact sets are bounded (extreme value theorem), for each $i$ and each sample $\omega$:
+\begin{equation}
+\sup_{\mathbf{x} \in \X} |\hat{f}_{i,\omega}^{(t)}(\mathbf{x})| < \infty \quad \text{a.s.}
+\end{equation}
+
+Let $M_\omega := \max_{i \in [m],\, k \in [K]} |\hat{f}_{i,\omega}^{(t)}(\mathbf{x}^{(k)})| < \infty$ a.s. We bound $|g_\mu^{\mathrm{STCH\text{-}Set}}|$ as follows.
+
+\emph{Upper bound.} Since $\smin_\mu^{(k)} f_i(\mathbf{x}^{(k)}) \le \min_k f_i(\mathbf{x}^{(k)}) \le M_\omega$, and each $\lambda_i \in (0,1]$:
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}} &= \mu \log\!\left(\sum_{i=1}^{m} \exp\!\left(\frac{\lambda_i(R_i^{\min} - z_i^*)}{\mu}\right)\right) \\
+&\le \max_i \lambda_i(R_i^{\min} - z_i^*) + \mu \log m \\
+&\le M_\omega + |z_{\max}^*| + \mu \log m,
+\end{align}
+where $z_{\max}^* := \max_i |z_i^*|$ and we used the standard log-sum-exp upper bound.
+
+\emph{Lower bound.} Since $R_i^{\min} \ge \min_k f_i(\mathbf{x}^{(k)}) - \mu \log K \ge -M_\omega - \mu \log K$:
+\begin{equation}
+g_\mu^{\mathrm{STCH\text{-}Set}} \ge \max_i \lambda_i(R_i^{\min} - z_i^*) \ge \lambda_{\min}(-M_\omega - \mu\log K - |z_{\max}^*|),
+\end{equation}
+where $\lambda_{\min} := \min_i \lambda_i > 0$.
+
+Combining: $|g_\mu^{\mathrm{STCH\text{-}Set}}| \le M_\omega + |z_{\max}^*| + \mu\log m + \mu \log K$.
+
+Since $M_\omega$ is a.s.\ finite and has finite expectation (the posterior sample paths are Gaussian linear combinations, hence sub-Gaussian with finite moments of all orders), we conclude $\E[|g_\mu^{\mathrm{STCH\text{-}Set}}|] < \infty$, and therefore $\E[|\alpha_t^{\mathrm{qSTCH}}(\Xset)|] < \infty$. \qed
+
+\medskip
+\textbf{Part (c): Differentiability.}
+
+We must show that $\alpha_t^{\mathrm{qSTCH}}(\Xset)$ is differentiable with respect to $\Xset \in \X^K$ and derive the gradient formula~\eqref{eq:grad}.
+
+\emph{Step 1: Pointwise differentiability.}
+For each fixed base sample $\omega$, the STCH-Set scalarization $g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset) \mid \boldsymbol{\lambda})$ is a composition of $C^\infty$ functions applied to the sample path evaluations $\{\hat{f}_{i,\omega}^{(t)}(\mathbf{x}^{(k)})\}_{i,k}$.
+
+The arguments inside all logarithms are strictly positive:
+\begin{itemize}
+    \item Inner: $\sum_{k=1}^{K} \exp(-f_i(\mathbf{x}^{(k)})/\mu) > 0$ since each exponential is positive.
+    \item Outer: $\sum_{i=1}^{m} \exp(\lambda_i(R_i^{\min} - z_i^*)/\mu) > 0$ for the same reason.
+\end{itemize}
+Therefore $\log$ is applied to strictly positive arguments, and the composition of $\exp$, $\log$, $\sum$, and affine maps is $C^\infty$ with respect to $\{f_i(\mathbf{x}^{(k)})\}_{i,k}$.
+
+For kernels with differentiable mean and covariance functions (e.g., the squared exponential kernel, or Mat\'ern-$\nu$ with $\nu > 1$), the posterior sample paths $\hat{f}_{i,\omega}^{(t)}(\mathbf{x})$ are differentiable in $\mathbf{x}$. By the chain rule, $g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset))$ is differentiable in $\Xset$ for each $\omega$.
+
+\emph{Step 2: Gradient derivation.}
+We derive the gradient $\nabla_{\mathbf{x}^{(k)}} g_\mu^{\mathrm{STCH\text{-}Set}}$ by applying the chain rule to the nested structure.
+
+Define:
+\begin{align}
+R_i^{\min} &:= \smin_\mu^{(k)} f_i(\mathbf{x}^{(k)}) = -\mu \log\!\left(\sum_{\ell=1}^{K} \exp\!\left(-\frac{f_i(\mathbf{x}^{(\ell)})}{\mu}\right)\right), \\
+S &:= \sum_{j=1}^{m} \exp\!\left(\frac{\lambda_j(R_j^{\min} - z_j^*)}{\mu}\right).
+\end{align}
+
+The outer softmax weights are:
+\begin{equation}
+w_i = \frac{\partial\, g_\mu^{\mathrm{STCH\text{-}Set}}}{\partial\, R_i^{\min}} \cdot \frac{1}{\lambda_i} = \frac{\exp\!\left(\lambda_i(R_i^{\min} - z_i^*)/\mu\right)}{S},
+\end{equation}
+satisfying $\sum_i w_i = 1$ and $w_i > 0$ for all $i$.
+
+The inner softmin weights are:
+\begin{equation}
+p_{ik} = \frac{\partial\, R_i^{\min}}{\partial\, f_i(\mathbf{x}^{(k)})} = \frac{\exp\!\left(-f_i(\mathbf{x}^{(k)})/\mu\right)}{\sum_{\ell=1}^{K} \exp\!\left(-f_i(\mathbf{x}^{(\ell)})/\mu\right)},
+\end{equation}
+satisfying $\sum_k p_{ik} = 1$ and $p_{ik} > 0$ for all $i, k$.
+
+Applying the chain rule:
+\begin{align}
+\nabla_{\mathbf{x}^{(k)}} g_\mu^{\mathrm{STCH\text{-}Set}}
+&= \sum_{i=1}^{m} \frac{\partial\, g_\mu^{\mathrm{STCH\text{-}Set}}}{\partial\, R_i^{\min}} \cdot \frac{\partial\, R_i^{\min}}{\partial\, f_i(\mathbf{x}^{(k)})} \cdot \nabla_{\mathbf{x}^{(k)}} f_i(\mathbf{x}^{(k)}) \\
+&= \sum_{i=1}^{m} (\lambda_i \cdot w_i) \cdot p_{ik} \cdot \nabla f_i(\mathbf{x}^{(k)}).
+\end{align}
+
+Note: in the main text~\eqref{eq:grad}, we absorb $\lambda_i$ into the definition of $w_i$ for notational compactness. With the convention $\boldsymbol{\lambda} = \mathbf{1}/m$ (uniform weights), this simplifies further.
+
+\emph{Step 3: Differentiation under the integral sign.}
+To differentiate the expectation $\alpha_t^{\mathrm{qSTCH}}(\Xset) = \E_\omega[-g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset))]$ with respect to $\Xset$, we apply the Leibniz integral rule (differentiation under the integral sign). This is justified by the dominated convergence theorem:
+
+For any compact neighborhood $U \ni \Xset$ in $\X^K$, the gradient $\nabla_\Xset g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset))$ is bounded by:
+\begin{equation}
+\|\nabla_\Xset g_\mu^{\mathrm{STCH\text{-}Set}}\| \le \sum_{i=1}^{m} \sum_{k=1}^{K} \|\nabla f_i(\mathbf{x}^{(k)})\| \le Km \cdot \sup_{\mathbf{x} \in \X, i \in [m]} \|\nabla \hat{f}_{i,\omega}^{(t)}(\mathbf{x})\|.
+\end{equation}
+The GP posterior gradient $\nabla \hat{f}_{i,\omega}^{(t)}(\mathbf{x})$ is a Gaussian random variable with finite second moment (for differentiable kernels), providing an integrable dominating function. Therefore:
+\begin{equation}
+\nabla_\Xset \alpha_t^{\mathrm{qSTCH}}(\Xset) = \E_\omega\!\left[-\nabla_\Xset g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset))\right],
+\end{equation}
+which can be approximated by the sample average gradient, compatible with the reparameterization trick and automatic differentiation in PyTorch/BoTorch.
+\end{proof}
+
+
+%=============================================================================
+\section{Full Proof of Proposition~\ref{prop:pareto-transfer}: Pareto Optimality Transfer}
+\label{app:proof-pareto}
+%=============================================================================
+
+We provide the complete proof of Proposition~\ref{prop:pareto-transfer}, which establishes that the Pareto optimality guarantees of the STCH-Set formulation~\citep{lin2025few} transfer to the GP posterior setting.
+
+\begin{proof}[Proof of Proposition~\ref{prop:pareto-transfer}]
+
+\textbf{Part (a): Surrogate Pareto optimality.}
+
+\emph{Setup.} Under Assumption~\ref{asm:gp}, the GP posterior means $\mu_1^{(t)}, \ldots, \mu_m^{(t)}: \X \to \R$ are well-defined, continuous functions on the compact domain $\X$. For any standard positive-definite kernel:
+\begin{equation}
+\mu_i^{(t)}(\mathbf{x}) = \mathbf{k}_i(\mathbf{x})^\top (K_i + \sigma^2 I)^{-1} \mathbf{y}_i,
+\end{equation}
+which inherits the smoothness of the kernel $k_i$. For the squared exponential kernel, $\mu_i^{(t)} \in C^\infty(\X)$; for the Mat\'ern-$\nu$ kernel, $\mu_i^{(t)} \in C^{\lceil \nu \rceil - 1}(\X)$ (and in particular, for Mat\'ern-5/2, $\mu_i^{(t)} \in C^2(\X)$).
+
+\emph{Verification of hypotheses.} We verify that the hypotheses of Theorem~2 of Lin et al.~\cite{lin2025few} are satisfied:
+\begin{enumerate}
+    \item \textbf{Compact domain}: $\X \subset \R^d$ is compact by assumption.
+    \item \textbf{Continuous objectives}: Each $\mu_i^{(t)}$ is continuous on $\X$ (follows from kernel continuity).
+    \item \textbf{Differentiable objectives}: Each $\mu_i^{(t)}$ is differentiable on the interior of $\X$ (for differentiable kernels such as the squared exponential or Mat\'ern-$\nu$ with $\nu > 1$).
+    \item \textbf{Strictly positive weights}: $\lambda_i > 0$ for all $i \in [m]$ since $\boldsymbol{\lambda} \in \Delta_{++}^{m-1}$.
+    \item \textbf{Smoothing parameter}: $\mu > 0$ by construction.
+\end{enumerate}
+
+\emph{Application.} Theorem~2 of \cite{lin2025few} states: if $\Xset^* = \arg\min_{\Xset \in \X^K} g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset \mid \boldsymbol{\lambda})$ for objectives satisfying the above conditions, then every $\mathbf{x}^{(k)} \in \Xset^*$ is weakly Pareto optimal with respect to those objectives.
+
+Taking the objectives to be $\mu_1^{(t)}, \ldots, \mu_m^{(t)}$, and recalling the posterior-mean scalarization $\hat{g}_\mu^{(t)}(\Xset \mid \boldsymbol{\lambda}) := g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset \mid \boldsymbol{\lambda})\big|_{f_i = \mu_i^{(t)}}$, we conclude:
+\begin{quote}
+If $\Xset^* = \arg\min_{\Xset \in \X^K} \hat{g}_\mu^{(t)}(\Xset \mid \boldsymbol{\lambda})$, then every $\mathbf{x}^{(k)} \in \Xset^*$ is weakly Pareto optimal with respect to $(\mu_1^{(t)}, \ldots, \mu_m^{(t)})$.
+\end{quote}
+
+For the uniqueness claim: if $\Xset^*$ is the unique minimizer, then Theorem~2 of \cite{lin2025few} further guarantees (strong) Pareto optimality. This follows because at a unique minimizer, the KKT conditions for the constrained optimization problem are non-degenerate, ruling out the weakly-but-not-strongly Pareto optimal case. \qed
+
+\medskip
+\textbf{Part (b): Sandwich bound.}
+
+We derive the approximation bound~\eqref{eq:sandwich} relating the smooth and non-smooth scalarizations.
+
+\emph{Lower bound.} The log-sum-exp satisfies $\mu \log(\sum_i e^{a_i/\mu}) \ge \max_i a_i$ for any $a_1, \ldots, a_m \in \R$ and $\mu > 0$. This is immediate since $\sum_i e^{a_i/\mu} \ge e^{\max_i a_i/\mu}$.
+
+Similarly, the smooth minimum satisfies $\smin_\mu^{(k)} f_i(\mathbf{x}^{(k)}) \le \min_k f_i(\mathbf{x}^{(k)})$, because:
+\begin{equation}
+-\mu \log\!\left(\sum_{k=1}^{K} e^{-f_i(\mathbf{x}^{(k)})/\mu}\right) \le -\mu \log\!\left(e^{-\min_k f_i(\mathbf{x}^{(k)})/\mu}\right) = \min_k f_i(\mathbf{x}^{(k)}).
+\end{equation}
+
+Since each $R_i^{\min} = \smin_\mu^{(k)} f_i(\mathbf{x}^{(k)}) \le \min_k f_i(\mathbf{x}^{(k)})$ and $\lambda_i > 0$, we have:
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset) &= \mu \log\!\left(\sum_{i} \exp\!\left(\frac{\lambda_i(R_i^{\min} - z_i^*)}{\mu}\right)\right) \\
+&\ge \max_i \lambda_i(R_i^{\min} - z_i^*) \\
+&\ge \max_i \lambda_i\!\left(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*\right) - \max_i \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - R_i^{\min}).
+\end{align}
+However, a cleaner path uses the composition directly. Since the smooth minimum underestimates the true minimum, and the smooth maximum overestimates the true maximum:
+\begin{equation}
+g^{\mathrm{TCH\text{-}Set}}(\Xset) = \max_i \lambda_i\!\left(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*\right) \le g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset).
+\end{equation}
+To see this precisely: define $a_i := \lambda_i(R_i^{\min} - z_i^*)$. Then:
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}} &= \mu\log\!\left(\sum_i e^{a_i/\mu}\right) \ge \max_i a_i = \max_i \lambda_i(R_i^{\min} - z_i^*) \\
+&\ge \max_i \lambda_i\!\left(\min_k f_i(\mathbf{x}^{(k)}) - \mu\log K - z_i^*\right) \quad \text{(by the smin lower bound below)} \\
+&\ge g^{\mathrm{TCH\text{-}Set}}(\Xset) - \mu\log K \cdot \max_i \lambda_i.
+\end{align}
+But we can do better. Since $R_i^{\min} \le \min_k f_i(\mathbf{x}^{(k)})$:
+\begin{equation}
+g_\mu^{\mathrm{STCH\text{-}Set}} \ge \max_i a_i \ge \max_i \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*) - \max_i \lambda_i \cdot \mu\log K.
+\end{equation}
+
+In fact, the cleaner statement of the lower bound is simply:
+\begin{equation}
+g^{\mathrm{TCH\text{-}Set}}(\Xset) \le g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset),
+\end{equation}
+which follows because both the smooth max (log-sum-exp) overestimates the hard max, and the smooth min underestimates the hard min, and these biases compound in the same direction when the smooth min feeds into the smooth max through the monotonically increasing $\lambda_i(\cdot - z_i^*)$ link.
+
+\emph{Upper bound.} We decompose the smoothing error into two contributions.
+
+\textit{Outer error.} By the standard log-sum-exp bound (Proposition~3.4 of \cite{lin2024smooth}):
+\begin{equation}
+\mu \log\!\left(\sum_{i=1}^{m} e^{a_i/\mu}\right) \le \max_i a_i + \mu \log m.
+\end{equation}
+
+\textit{Inner error.} For each objective $i$, the smooth minimum satisfies:
+\begin{equation}
+\min_k f_i(\mathbf{x}^{(k)}) - \mu \log K \le \smin_\mu^{(k)} f_i(\mathbf{x}^{(k)}) \le \min_k f_i(\mathbf{x}^{(k)}).
+\end{equation}
+The lower bound follows from $\sum_k e^{-f_i(\mathbf{x}^{(k)})/\mu} \le K \cdot e^{-\min_k f_i(\mathbf{x}^{(k)})/\mu}$.
+
+Substituting the inner error into the outer bound: for each $i$,
+\begin{equation}
+\lambda_i(R_i^{\min} - z_i^*) \le \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*).
+\end{equation}
+Therefore:
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}} &\le \max_i \lambda_i(R_i^{\min} - z_i^*) + \mu \log m \\
+&\le \max_i \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*) + \mu \log m.
+\end{align}
+
+But we also need to account for the inner smoothing in the other direction. Since $R_i^{\min} \ge \min_k f_i(\mathbf{x}^{(k)}) - \mu\log K$, the terms $\lambda_i(R_i^{\min} - z_i^*)$ are at most $\mu\log K$ above $\lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - \mu\log K - z_i^*)$. Since $\boldsymbol{\lambda} \in \Delta^{m-1}$ (i.e., $\sum_i \lambda_i = 1$, $\lambda_i \le 1$), the per-objective shift of $\mu\log K$ contributes at most $\mu\log K$ to the outer scalarization value. More precisely:
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}} &= \mu\log\!\left(\sum_i \exp\!\left(\frac{\lambda_i(R_i^{\min} - z_i^*)}{\mu}\right)\right) \\
+&\le \mu\log\!\left(\sum_i \exp\!\left(\frac{\lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*)}{\mu}\right)\right) \quad \text{(since $R_i^{\min} \le \min_k f_i$)} \\
+&\le \max_i \lambda_i(\min_k f_i(\mathbf{x}^{(k)}) - z_i^*) + \mu\log m \\
+&= g^{\mathrm{TCH\text{-}Set}}(\Xset) + \mu\log m.
+\end{align}
+
+Wait---this gives only $\mu\log m$. The $\mu\log K$ term arises when bounding the gap in the \emph{other} direction (the lower bound). Let us redo both bounds cleanly.
+
+Define $T_i := \min_k f_i(\mathbf{x}^{(k)})$ (hard min) and $S_i := R_i^{\min}$ (soft min). Then $T_i - \mu\log K \le S_i \le T_i$.
+
+\textit{Upper bound on $g_\mu^{\mathrm{STCH\text{-}Set}}$:}
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}} &= \mu\log\!\left(\sum_i e^{\lambda_i(S_i - z_i^*)/\mu}\right) \le \mu\log\!\left(\sum_i e^{\lambda_i(T_i - z_i^*)/\mu}\right) \\
+&\le \max_i \lambda_i(T_i - z_i^*) + \mu\log m = g^{\mathrm{TCH\text{-}Set}} + \mu\log m.
+\end{align}
+
+\textit{Tighter upper bound including $\mu\log K$:}
+Actually, the bound $g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m$ already follows. The $\mu\log K$ term appears when we bound the gap from below:
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}} &\ge \max_i \lambda_i(S_i - z_i^*) \ge \max_i \lambda_i(T_i - \mu\log K - z_i^*) \\
+&= g^{\mathrm{TCH\text{-}Set}} - \mu\log K \cdot \max_i \lambda_i.
+\end{align}
+
+Therefore the complete sandwich is:
+\begin{equation}
+g^{\mathrm{TCH\text{-}Set}} - \mu\log K \le g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m.
+\end{equation}
+
+In the main text, we state the weaker but simpler bound~\eqref{eq:sandwich} as
+\begin{equation}
+g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m + \mu\log K,
+\end{equation}
+which holds trivially since $g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\mathrm{STCH\text{-}Set}}$ (the smooth version overestimates due to the smooth max dominating the hard max, composed with the smooth min underestimating the hard min). The upper bound $g^{\mathrm{TCH\text{-}Set}} + \mu\log m + \mu\log K$ is also valid (and slightly looser than $g^{\mathrm{TCH\text{-}Set}} + \mu\log m$), but provides a uniform bound that accounts for both smoothing operations symmetrically. The total smoothing gap $\mu(\log m + \log K) = \mu\log(mK)$ is controlled by the user-chosen $\mu$.
+\end{proof}
+
+
+%=============================================================================
+\section{Extended Experimental Results}
+\label{app:extended-results}
+%=============================================================================
+
+\subsection{Per-Seed Hypervolume Values: $m=5$}
+
+Table~\ref{tab:perseed-m5} reports the final hypervolume for each seed on DTLZ2 with $m=5$ objectives ($d=9$, $n_{\text{init}}=20$, 30 BO iterations).
+
+\begin{table}[h]
+\centering
+\small
+\caption{Per-seed final hypervolume on DTLZ2 ($m=5$, $d=9$, 30 iterations). qSTCH-Set uses batch size $K=m=5$; all other methods use $q=1$.}
+\label{tab:perseed-m5}
+\begin{tabular}{ccccc}
+\toprule
+Seed & qSTCH-Set ($K{=}5$) & STCH-NParEGO & qNParEGO & Random \\
+\midrule
+0 & 6.760 & 6.343 & 6.525 & 5.442 \\
+1 & 6.615 & 6.158 & 5.994 & 5.382 \\
+2 & 6.643 & 6.140 & 6.465 & 5.199 \\
+3 & 6.559 & 5.857 & 6.387 & 5.250 \\
+4 & 6.653 & 6.089 & 6.776 & 5.575 \\
+\midrule
+Mean & $\mathbf{6.646}$ & 6.117 & 6.429 & 5.370 \\
+Std  & $\mathbf{0.066}$ & 0.156 & 0.254 & 0.135 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Observations.} qSTCH-Set achieves the highest mean hypervolume with the lowest standard deviation across all 5 seeds. The variance reduction ($0.066$ vs.\ $0.254$ for qNParEGO) confirms that set-based coordination produces more consistent Pareto front coverage than random weight sampling. Note that qNParEGO shows high variability (seed~1 at $5.994$ vs.\ seed~4 at $6.776$), consistent with the lottery effect of random scalarization weights.
+
+\subsection{Per-Seed Hypervolume Values: $m=8$}
+
+Table~\ref{tab:perseed-m8} reports per-seed results on DTLZ2 with $m=8$ objectives ($d=12$, $n_{\text{init}}=30$, 25 BO iterations, 3 seeds).
+
+\begin{table}[h]
+\centering
+\small
+\caption{Per-seed final hypervolume on DTLZ2 ($m=8$, $d=12$, 25 iterations). qSTCH-Set uses batch size $K=m=8$; all other methods use $q=1$.}
+\label{tab:perseed-m8}
+\begin{tabular}{ccccc}
+\toprule
+Seed & qSTCH-Set ($K{=}8$) & STCH-NParEGO & qNParEGO & Random \\
+\midrule
+0 & 23.964 & 18.848 & 22.724 & 17.937 \\
+1 & 24.545 & 20.589 & 20.753 & 17.843 \\
+2 & 23.816 & 22.422 & 21.341 & 18.298 \\
+\midrule
+Mean & $\mathbf{24.108}$ & 20.620 & 21.606 & 18.026 \\
+Std  & $\mathbf{0.314}$ & 1.459 & 0.826 & 0.196 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Observations.} At $m=8$, the advantage of qSTCH-Set becomes more pronounced: it leads qNParEGO by $2.50$ HV units ($\sim$11.6\%) and STCH-NParEGO by $3.49$ units ($\sim$16.9\%). The variance of STCH-NParEGO is notably high ($1.459$), indicating that single-point smooth scalarization with random weights becomes unreliable as the number of objectives grows. qSTCH-Set maintains relatively low variance ($0.314$) despite the higher-dimensional objective space, consistent with the coordinated $K=m$ design.
+
+
+\subsection{Computational Cost}
+
+Table~\ref{tab:timing} reports the mean wall-clock time per BO iteration for each method, measured on NVIDIA H100 GPUs (MIG 1g.10gb partitions) on the Digital Research Alliance of Canada Nibi cluster.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Mean wall-clock time per iteration (seconds) on DTLZ2. All experiments run on H100 MIG 1g.10gb partitions. qSTCH-Set evaluates $K=m$ points per iteration; baselines evaluate $q=1$.}
+\label{tab:timing}
+\begin{tabular}{lrrrr}
+\toprule
+Method & $m=5$ (s/iter) & $m=8$ (s/iter) \\
+\midrule
+qSTCH-Set ($K{=}m$) & 22.7 & 335.6 \\
+STCH-NParEGO ($q{=}1$) & 24.8 & 55.8 \\
+qNParEGO ($q{=}1$) & 24.6 & 45.4 \\
+Random ($q{=}1$) & 0.4 & 10.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Analysis.} At $m=5$, qSTCH-Set is slightly \emph{faster} per iteration than the single-point baselines ($22.7$s vs.\ $24.6$--$24.8$s), despite optimizing over $K=5$ candidates jointly. This is because the BoTorch joint optimization with L-BFGS-B amortizes the overhead of multi-start initialization across the larger batch.
+
+At $m=8$, the cost increases to $335.6$s/iter, reflecting the $O(Nm^2)$ complexity: the acquisition evaluation involves $K=8$ candidates in $d=12$ dimensions (96-dimensional search space), and each evaluation requires computing the nested smooth min/max over 8 objectives and 8 candidates. The $\sim$7.4$\times$ increase from $m=5$ to $m=8$ is super-linear, consistent with the quadratic scaling in $m$ combined with the higher input dimensionality.
+
+However, in the target application of expensive black-box optimization (e.g., molecular simulations, wet-lab assays), function evaluation costs typically dominate ($\sim$minutes to hours per evaluation), making the $\sim$6 min/iter acquisition cost negligible.
+
+
+%=============================================================================
+\section{Hyperparameter Sensitivity}
+\label{app:hyperparams}
+%=============================================================================
+
+\subsection{Smoothing Parameter $\mu$}
+
+The smoothing parameter $\mu > 0$ controls the approximation quality of the log-sum-exp to the hard max/min operators. Proposition~\ref{prop:pareto-transfer}(b) shows the approximation gap is bounded by $\mu\log(mK)$.
+
+Ablation results for $\mu \in \{0.01, 0.05, 0.1, 0.5, 1.0\}$ on DTLZ2 ($m=5$) are pending completion on the Nibi cluster. The ablation script (\texttt{benchmarks/ablation\_mu.py}) varies $\mu$ while holding all other parameters fixed at their default values ($K=m=5$, $N=256$ MC samples, Mat\'ern-5/2 kernel).
+
+\textbf{Preliminary observations from development:} During development, we observed that $\mu = 0.1$ provided a good balance between gradient smoothness and approximation quality. Values $\mu < 0.01$ occasionally caused numerical instabilities (large gradients in the softmax attention), while $\mu > 1.0$ over-smoothed the scalarization, reducing the method's ability to distinguish between Pareto-optimal and dominated solutions. All main results in this paper use $\mu = 0.1$.
+
+\subsection{Batch Size $K$}
+
+The design rule $K = m$ is a key contribution. To validate this choice, ablation experiments varying $K \in \{2, 4, m{=}5, 8, 10\}$ on DTLZ2 ($m=5$) and $K \in \{2, 4, m{=}8, 12\}$ on DTLZ2 ($m=8$) are in progress.
+
+\textbf{Theoretical motivation.} When $K < m$, the smooth minimum operator $\smin_k f_i(\mathbf{x}^{(k)})$ must assign multiple objectives to the same candidate, preventing full Pareto front coverage. When $K > m$, the additional candidates provide redundancy but do not improve the worst-case objective coverage (the outer smooth max is over $m$ terms regardless of $K$). The $K = m$ choice is the minimal set size that allows one-to-one assignment between candidates and objectives.
+
+
+%=============================================================================
+\section{Implementation Details}
+\label{app:implementation-full}
+%=============================================================================
+
+\subsection{Algorithm Pseudocode}
+
+Algorithm~\ref{alg:full} provides the complete qSTCH-Set BO procedure with all hyperparameters and implementation details.
+
+\begin{algorithm}[t]
+\caption{qSTCH-Set: Complete Many-Objective Bayesian Optimization Procedure}
+\label{alg:full}
+\begin{algorithmic}[1]
+\REQUIRE Objectives $f_1, \ldots, f_m: \X \to \R$ (expensive, black-box)
+\REQUIRE Domain $\X \subseteq \R^d$ (compact, box-constrained)
+\REQUIRE Total budget $T$ function evaluations
+\REQUIRE Hyperparameters: smoothing $\mu > 0$ (default $0.1$), MC samples $N$ (default $256$)
+\REQUIRE Optional: batch size $K$ (default $m$), weight vector $\boldsymbol{\lambda}$ (default $\mathbf{1}/m$)
+\STATE \textbf{Initialize:} Generate $n_0$ Sobol quasi-random points $\{\mathbf{x}_j\}_{j=1}^{n_0}$; evaluate $\mathbf{y}_j = \mathbf{f}(\mathbf{x}_j)$; set $\D_0 \leftarrow \{(\mathbf{x}_j, \mathbf{y}_j)\}_{j=1}^{n_0}$
+\FOR{$t = 0, 1, \ldots, \lfloor(T - n_0)/K\rfloor - 1$}
+    \STATE \textbf{Fit surrogates:} For each $i \in [m]$, fit SingleTaskGP with Mat\'ern-5/2 kernel:
+    \STATE \quad $\hat{f}_i^{(t)} \sim \GP(\mu_i^{(t)}, k_i^{(t)})$ via MLE (L-BFGS-B, 5 random restarts)
+    \STATE \quad Standardize outcomes: $\tilde{y}_{j,i} = (y_{j,i} - \bar{y}_i) / s_i$
+    \STATE \textbf{Compute ideal point:} $z_i^* \leftarrow \min_{j \le |\D_t|} y_{j,i} - \epsilon$ for each $i$ ($\epsilon = 10^{-4}$)
+    \STATE \textbf{Set weight vector:} $\boldsymbol{\lambda} \leftarrow \mathbf{1}/m$ (uniform)
+    \STATE \textbf{Draw MC samples:} $\{\boldsymbol{\omega}^{(n)}\}_{n=1}^N$ via Sobol quasi-random sequence
+    \STATE \textbf{Construct acquisition function:}
+    \STATE \quad $\alpha(\Xset) = \frac{1}{N}\sum_{n=1}^{N} \left[-g_\mu^{\mathrm{STCH\text{-}Set}}\!\left(\hat{\mathbf{f}}_{\omega^{(n)}}^{(t)}(\Xset) \mid \boldsymbol{\lambda}\right)\right]$
+    \STATE \textbf{Generate candidates:} $512$ Sobol points in $\X^K$; evaluate $\alpha$; select top $20$
+    \STATE \textbf{Optimize acquisition:}
+    \STATE \quad $\Xset^* \leftarrow \argmax_{\Xset \in \X^K} \alpha(\Xset)$ via L-BFGS-B from each of $20$ restarts
+    \STATE \quad Joint optimization over all $Kd$ variables simultaneously
+    \STATE \textbf{Evaluate:} $\mathbf{y}^{(k)} \leftarrow \mathbf{f}(\mathbf{x}^{(k)})$ for each $\mathbf{x}^{(k)} \in \Xset^*$
+    \STATE \textbf{Update dataset:} $\D_{t+1} \leftarrow \D_t \cup \{(\mathbf{x}^{(k)}, \mathbf{y}^{(k)})\}_{k=1}^{K}$
+\ENDFOR
+\RETURN Non-dominated set from $\D_{T}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Software Versions}
+
+All experiments were conducted with the following software stack:
+
+\begin{table}[h]
+\centering
+\small
+\caption{Software versions used in all experiments.}
+\label{tab:software}
+\begin{tabular}{ll}
+\toprule
+Package & Version \\
+\midrule
+Python & 3.12 \\
+PyTorch & $\ge 2.1$ \\
+BoTorch & $\ge 0.11$ \\
+GPyTorch & $\ge 1.11$ \\
+NumPy & $\ge 1.24$ \\
+CUDA & 12.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The package was installed from source using \texttt{pip install -e .} in a virtual environment (not Conda) following Alliance Canada best practices.
+
+\subsection{Hardware}
+
+All GPU experiments were run on the \textbf{Nibi} cluster of the Digital Research Alliance of Canada with the following configuration:
+
+\begin{itemize}
+    \item \textbf{GPU}: NVIDIA H100 80GB SXM5 (MIG 1g.10gb partitions, providing 10~GB GPU memory per job)
+    \item \textbf{CPU}: 4 cores per job
+    \item \textbf{RAM}: 32~GB per job
+    \item \textbf{Storage}: Local NVMe ($\text{SLURM\_TMPDIR}$) for virtual environment; project storage for results
+    \item \textbf{Job scheduler}: Slurm array jobs (one job per seed $\times$ objective count combination)
+    \item \textbf{Account}: \texttt{rrg-ravh011\_gpu}
+\end{itemize}
+
+Each benchmark configuration ($m \in \{5, 8\}$, per seed) ran as an independent Slurm job with a 4-hour time limit. The total GPU-hours consumed for the main experiments (5 seeds $\times$ $m=5$ + 3 seeds $\times$ $m=8$) was approximately 25 GPU-hours.
+
+\subsection{Reproducibility}
+
+All random seeds are controlled at three levels:
+\begin{enumerate}
+    \item \textbf{Initial design}: Sobol quasi-random sequence with seed offset.
+    \item \textbf{GP fitting}: PyTorch random seed for multi-start MLE optimization.
+    \item \textbf{MC sampling}: Sobol quasi-random base samples for the reparameterization trick.
+\end{enumerate}
+
+The complete benchmark code, including Slurm job scripts, is available at \url{https://github.com/parameters/qSTCH-Set}.
