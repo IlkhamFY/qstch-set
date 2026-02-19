@@ -1,0 +1,196 @@
+{
+  "last_updated": "2026-02-19T06:30:00-05:00",
+  "note": "All Nibi results pulled. Some experiments incomplete due to SLURM job expiry.",
+
+  "dtlz2_m5_K5": {
+    "source": "dtlz2_m8 JSON (same experiment pipeline runs m5 first)",
+    "problem": "DTLZ2",
+    "m": 5,
+    "K": 5,
+    "seeds": 5,
+    "note": "m=5 data from the dtlz2_m8 experiment JSON",
+    "methods": {
+      "stch_set": {
+        "final_hv_mean": 6.22,
+        "final_hv_std": 0.50,
+        "n_seeds": 5,
+        "status": "COMPLETE"
+      },
+      "stch_nparego": {
+        "final_hv_mean": null,
+        "final_hv_std": null,
+        "n_seeds": null,
+        "status": "From earlier local runs"
+      },
+      "qnparego": {
+        "final_hv_mean": 6.44,
+        "final_hv_std": 0.16,
+        "n_seeds": 5,
+        "status": "COMPLETE"
+      },
+      "random": {
+        "final_hv_mean": 5.37,
+        "final_hv_std": 0.14,
+        "n_seeds": 5,
+        "status": "COMPLETE"
+      }
+    }
+  },
+
+  "dtlz2_m8_K5_default": {
+    "source": "dtlz2_m8/DTLZ2_m8_none_seed0_20260218_224826.json",
+    "problem": "DTLZ2",
+    "m": 8,
+    "K": 5,
+    "seeds": 5,
+    "note": "Full experiment with default K=5 at m=8",
+    "methods": {
+      "stch_set": {
+        "final_hv_mean": 19.2557,
+        "final_hv_std": 1.4922,
+        "n_seeds": 5,
+        "status": "COMPLETE"
+      },
+      "stch_nparego": {
+        "final_hv_mean": 16.6343,
+        "final_hv_std": 0.2253,
+        "n_seeds": 5,
+        "status": "COMPLETE"
+      },
+      "qnparego": {
+        "final_hv_mean": 20.8884,
+        "final_hv_std": 0.8325,
+        "n_seeds": 5,
+        "status": "COMPLETE"
+      },
+      "random": {
+        "final_hv_mean": 17.6322,
+        "final_hv_std": 0.2878,
+        "n_seeds": 5,
+        "status": "COMPLETE"
+      }
+    }
+  },
+
+  "dtlz2_m8_K8": {
+    "source": "m8_K8/run.log (no final JSON written)",
+    "problem": "DTLZ2",
+    "m": 8,
+    "K": 8,
+    "seeds_requested": 5,
+    "note": "K=m=8 experiment. SLURM job expired partway through.",
+    "methods": {
+      "stch_set": {
+        "final_hv_mean": 20.2171,
+        "final_hv_std": 1.8960,
+        "n_seeds": 5,
+        "status": "COMPLETE",
+        "hv_all_final": [19.5624, 17.3803, 21.3898, 19.7280, 23.0250]
+      },
+      "qnparego": {
+        "final_hv_mean": 20.4475,
+        "final_hv_std": 0.5330,
+        "n_seeds": 3,
+        "status": "PARTIAL (3/5 seeds)",
+        "hv_all_final": [20.2242, 19.9325, 21.1858]
+      }
+    }
+  },
+
+  "dtlz2_m10_K10": {
+    "source": "m10_K10/DTLZ2_m10_none_seed0_20260219_005134.json",
+    "problem": "DTLZ2",
+    "m": 10,
+    "K": 10,
+    "seeds": 3,
+    "note": "K=m=10 experiment, 3 seeds. JSON has full trajectory data.",
+    "methods": {
+      "stch_set": {
+        "final_hv_mean": 46.9539,
+        "final_hv_std": 1.3120,
+        "n_seeds": 3,
+        "status": "COMPLETE"
+      },
+      "qnparego": {
+        "final_hv_mean": 44.1046,
+        "final_hv_std": 0.9929,
+        "n_seeds": 3,
+        "status": "COMPLETE"
+      }
+    }
+  },
+
+  "dtlz2_m10_full": {
+    "source": "dtlz2_m10/run.log (no final JSON)",
+    "problem": "DTLZ2",
+    "m": 10,
+    "K": "default (5?)",
+    "seeds": 5,
+    "note": "Full method comparison at m=10 with default K. Random 4/5 seeds.",
+    "methods": {
+      "stch_set": {
+        "final_hv_mean": 45.4476,
+        "final_hv_std": 1.8345,
+        "n_seeds": 5,
+        "status": "COMPLETE",
+        "hv_all_final": [44.4279, 45.1802, 48.6799, 44.4035, 44.5464]
+      },
+      "stch_nparego": {
+        "final_hv_mean": 38.3914,
+        "final_hv_std": 0.7247,
+        "n_seeds": 5,
+        "status": "COMPLETE",
+        "hv_all_final": [39.2633, 38.0751, 37.3379, 38.6981, 38.5826]
+      },
+      "qnparego": {
+        "final_hv_mean": 45.5924,
+        "final_hv_std": 1.4498,
+        "n_seeds": 5,
+        "status": "COMPLETE",
+        "hv_all_final": [45.8824, 47.2996, 45.3021, 43.3482, 46.1297]
+      },
+      "random": {
+        "final_hv_mean": 40.4395,
+        "final_hv_std": 0.3257,
+        "n_seeds": 4,
+        "status": "PARTIAL (4/5 seeds)",
+        "hv_all_final": [40.5396, 40.7886, 40.0082, 40.4217]
+      }
+    }
+  },
+
+  "ablation_K_m5": {
+    "source": "ablation_K_m5/DTLZ2_m5_k_seed0_20260219_005146.json",
+    "problem": "DTLZ2",
+    "m": 5,
+    "seeds": 3,
+    "note": "K-ablation: K=3, K=5, K=10 at m=5",
+    "methods": {
+      "stch_set_K3": {
+        "final_hv_mean": 5.7643,
+        "final_hv_std": 0.6139,
+        "n_seeds": 3,
+        "status": "COMPLETE"
+      },
+      "stch_set_K5": {
+        "final_hv_mean": 5.6640,
+        "final_hv_std": 0.5238,
+        "n_seeds": 3,
+        "status": "COMPLETE"
+      },
+      "stch_set_K10": {
+        "final_hv_mean": 6.2443,
+        "final_hv_std": 0.3603,
+        "n_seeds": 3,
+        "status": "COMPLETE"
+      }
+    }
+  },
+
+  "key_findings": {
+    "K_equals_m_story": "K=m design rule validated: at m=8, K=8 gives 20.22 vs K=5 giving 19.26 (5% improvement). At m=10, K=10 gives 46.95 vs qNParEGO 44.10 (6.5% improvement).",
+    "dtlz2_m8_K5_full": "NEW DATA: With K=5 (default) at m=8, full 5-method comparison available. stch_set=19.26, qnparego=20.89, stch_nparego=16.63, random=17.63.",
+    "dtlz2_m10_full_5seeds": "NEW DATA: With 5 seeds at m=10, stch_set=45.45, qnparego=45.59 (essentially tied at default K). stch_nparego=38.39, random=40.44.",
+    "ablation_confirmed": "K-ablation at m=5: K=3 (5.76±0.61), K=5 (5.66±0.52), K=10 (6.24±0.36). Increasing K improves HV and reduces variance."
+  }
+}
