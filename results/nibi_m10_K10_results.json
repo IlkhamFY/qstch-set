@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "timestamp": "20260219_005134",
+  "problem": "DTLZ2",
+  "m": 10,
+  "d": 11,
+  "n_init": 24,
+  "n_iters": 15,
+  "q_default": 1,
+  "K_default": 10,
+  "mu_default": 0.1,
+  "seeds": 3,
+  "ablation": "none",
+  "methods": {
+    "stch_set": {
+      "final_hv_mean": 46.953943274450815,
+      "final_hv_std": 1.3120370128498133,
+      "mean_iter_time": 10.098492866092258,
+      "n_errors": 0,
+      "hv_all_final": [48.587, 46.900, 45.375]
+    },
+    "qnparego": {
+      "final_hv_mean": 44.10463090599165,
+      "final_hv_std": 0.9929238977999069,
+      "mean_iter_time": 3.1087709108988446,
+      "n_errors": 0,
+      "hv_all_final": [44.111, 45.317, 42.885]
+    }
+  },
+  "summary": "STCH-Set(K=10) beats qNParEGO by 2.85 HV at m=10 (46.95 vs 44.10)"
+}

@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "timestamp": "20260219_005100",
+  "problem": "DTLZ2",
+  "m": 8,
+  "d": 9,
+  "n_init": 20,
+  "n_iters": 20,
+  "q_default": 1,
+  "K_default": 8,
+  "mu_default": 0.1,
+  "seeds": 5,
+  "status": "PARTIAL - SLURM job 8860821 expired, qNParEGO only 3/5 seeds complete",
+  "methods": {
+    "stch_set": {
+      "status": "COMPLETE (5 seeds)",
+      "final_hv_mean": 20.2171,
+      "final_hv_std": 1.8960,
+      "mean_iter_time": 9.6,
+      "n_errors": 0,
+      "hv_all_final": [19.5624, 17.3803, 21.3898, 19.7280, 23.0250]
+    },
+    "qnparego": {
+      "status": "INCOMPLETE (3/5 seeds)",
+      "seeds_completed": 3,
+      "hv_all_final": [20.2242, 19.9325, 21.1858],
+      "partial_mean": 20.4475,
+      "partial_std": 0.5330,
+      "note": "Need seeds 3 and 4 to complete"
+    }
+  },
+  "preliminary_verdict": "With 3/5 qNParEGO seeds vs 5/5 STCH-Set seeds: STCH-Set K=8 (20.22) vs qNParEGO (20.45) - essentially tied. Previous K=5 at m=8: STCH-Set 19.26 vs qNParEGO 20.89, so K=8 closed the gap significantly."
+}

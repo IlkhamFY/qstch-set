@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "timestamp": "20260219_005146",
+  "problem": "DTLZ2",
+  "m": 5,
+  "d": 6,
+  "n_init": 14,
+  "n_iters": 20,
+  "q_default": 1,
+  "K_default": 5,
+  "mu_default": 0.1,
+  "seeds": 3,
+  "ablation": "k",
+  "methods": {
+    "stch_set_K3": {
+      "final_hv_mean": 5.764284483236739,
+      "final_hv_std": 0.6139310585397761,
+      "mean_iter_time": 1.3847721378008524,
+      "n_errors": 0
+    },
+    "stch_set_K5": {
+      "final_hv_mean": 5.664009011647764,
+      "final_hv_std": 0.5238295568745996,
+      "mean_iter_time": 2.3553105076154073,
+      "n_errors": 0
+    },
+    "stch_set_K10": {
+      "final_hv_mean": 6.244348780305973,
+      "final_hv_std": 0.36027942898407744,
+      "mean_iter_time": 6.075262304147085,
+      "n_errors": 0
+    }
+  },
+  "summary": "K=10 best (6.24), K=3 second (5.76), K=5 worst (5.66). Larger K helps at m=5 but with significant time cost (6.1s vs 1.4s per iter)"
+}
