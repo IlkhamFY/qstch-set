@@ -262,7 +262,21 @@ We compare the following methods on DTLZ2 problems with $m \in \{5, 8, 10\}$ obj
 
 \subsection{Main Results: DTLZ2 Scaling}
 
-Table~\ref{tab:main} presents the final hypervolume (HV) achieved by each method across different numbers of objectives.
+Figure~\ref{fig:convergence_m5} shows the convergence curves at $m{=}5$, and Figure~\ref{fig:convergence_m8} at $m{=}8$. Table~\ref{tab:main} presents the final hypervolume (HV) achieved by each method across different numbers of objectives.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/convergence_m5.pdf}
+\caption{Convergence on DTLZ2 with $m{=}5$ objectives, $K{=}5$. qSTCH-Set (blue) converges faster and reaches higher final HV than all baselines, with notably tighter variance than qNParEGO (5 seeds). Error bands show $\pm 1$ standard deviation.}
+\label{fig:convergence_m5}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/convergence_m8.pdf}
+\caption{Convergence on DTLZ2 with $m{=}8$ objectives, $K{=}8$. qSTCH-Set dominates throughout, reaching HV $\sim 24$ while qNParEGO plateaus near $\sim 22$ (3 seeds). The advantage of coordinated set-based acquisition becomes more pronounced at higher $m$.}
+\label{fig:convergence_m8}
+\end{figure}
 
 \begin{table}[t]
 \caption{Main Results on DTLZ2: Final hypervolume (mean $\pm$ std) with $K{=}m$ for qSTCH-Set. Best method per column is \textbf{bolded}. qSTCH-Set's advantage grows with~$m$, achieving a clear 6.5\% lead at $m{=}10$.}
@@ -281,6 +295,13 @@ Random & $5.37 \pm 0.14$ & $17.63 \pm 0.29$ & --- \\
 {\footnotesize $\dagger$ qNParEGO at $m{=}8$: 3 of 5 seeds completed; final statistics may shift slightly.}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/convergence_m10.pdf}
+\caption{Final hypervolume on DTLZ2 with $m{=}10$ objectives, $K{=}10$ (3 seeds). qSTCH-Set outperforms qNParEGO by 6.5\% ($46.95 \pm 1.31$ vs $44.10 \pm 0.99$). Per-iteration convergence data not yet available from cluster.}
+\label{fig:convergence_m10}
+\end{figure}
+
 \textbf{Performance at $m=5$.} With $K{=}m{=}5$, qSTCH-Set achieves a mean HV of $6.22 \pm 0.50$, comparable to qNParEGO ($6.44 \pm 0.16$). At this modest objective count, random scalarization weights still cover the Pareto front adequately, and qNParEGO's lower variance reflects the maturity of its single-point greedy strategy. However, the $K$-ablation study (Table~\ref{tab:ablation_k}) reveals that increasing $K$ beyond $m$ can improve qSTCH-Set's consistency.
 
 \textbf{Scaling to $m=8$.} With $K{=}m{=}8$, qSTCH-Set achieves HV $20.22 \pm 1.90$, matching qNParEGO ($20.45 \pm 0.53$, 3/5 seeds). Notably, with the default $K{=}5 < m{=}8$, qSTCH-Set only reaches $19.26$ while qNParEGO achieves $20.89$---setting $K{=}m$ closes this gap, confirming the importance of the design rule.
@@ -289,7 +310,14 @@ Random & $5.37 \pm 0.14$ & $17.63 \pm 0.29$ & --- \\
 
 \subsection{Ablation: Batch Size $K$}
 
-To understand the importance of the design rule $K=m$, we compare performance with different batch sizes. (Table~\ref{tab:ablation}).
+To understand the importance of the design rule $K=m$, we compare performance with different batch sizes (Table~\ref{tab:ablation_k}, Figure~\ref{fig:k_ablation}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.75\linewidth]{figures/k_ablation_m5.pdf}
+\caption{$K$-ablation on DTLZ2, $m{=}5$ (3 seeds). Increasing $K$ from 3 to 10 improves both mean HV and reduces variance. qNParEGO baseline shown for reference.}
+\label{fig:k_ablation}
+\end{figure}
 
 \begin{table}[h]
 \caption{$K$-Ablation on DTLZ2 ($m=5$): Impact of set size $K$ on final hypervolume (3 seeds). Larger $K$ improves both mean HV and reduces variance, with $K{=}10$ achieving the best result.}

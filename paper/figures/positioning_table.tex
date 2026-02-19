@@ -1,0 +1,23 @@
+% Positioning table: 2x2 landscape of scalarization methods
+% Used as Figure 1 in the paper introduction
+%
+% Rows: Gradient-based / Bayesian Optimization
+% Cols: Single-point / Set-based
+%
+\begin{table}[t]
+\caption{Positioning of qSTCH-Set in the scalarization--optimization landscape.
+Set-based STCH has been applied to gradient-based optimization~\citep{lin2025few}
+and single-point STCH to Bayesian optimization~\citep{pires2025stch}.
+We fill the remaining cell.}
+\label{tab:positioning}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+ & Single Solution & Set of $K$ Solutions \\
+\midrule
+Gradient-based (cheap $f$) & STCH~\citep{lin2024smooth} & STCH-Set~\citep{lin2025few} \\
+Bayesian optimization (expensive $f$) & Pires \& Coelho~\citep{pires2025stch} & \textbf{qSTCH-Set (ours)} \\
+\bottomrule
+\end{tabular}
+\end{table}
