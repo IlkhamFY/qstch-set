@@ -31,6 +31,7 @@
 \theoremstyle{remark}
 \newtheorem{remark}[theorem]{Remark}
 \newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{assumption}[theorem]{Assumption}
 
 % Custom commands
 \newcommand{\placeholder}[1]{{\color{red}\textbf{[#1]}}}
@@ -177,35 +178,40 @@ All solutions in the optimal set $\Xset^*$ for the STCH-Set problem~\eqref{eq:st
 \label{sec:method}
 %=============================================================================
 
-We now present qSTCH-Set, which brings STCH-Set scalarization into the Bayesian optimization loop. The key idea is to apply Eq.~\eqref{eq:stchset} not to the true objectives $f_i(\mathbf{x})$ but to Monte Carlo samples from the GP posterior.
+We introduce \textbf{qSTCH-Set}, a Monte Carlo acquisition function that adapts the smooth Tchebycheff set scalarization~\citep{lin2025few} to Bayesian optimization. Our key insight is a principled design rule for the batch size: we set $q=K=m$, allocating one candidate per objective to ensure the batch can collectively span the vertices of the Pareto front.
 
 \subsection{Monte Carlo STCH-Set Acquisition Function}
 
-Given multi-output GP posteriors $\hat{f}_1, \ldots, \hat{f}_m$ fitted to data $\D_t$, we define the qSTCH-Set acquisition function for a candidate set $\Xset = \{\mathbf{x}^{(1)}, \ldots, \mathbf{x}^{(q)}\}$:
+Given $m$ independent GP posteriors $\hat{f}_1, \ldots, \hat{f}_m$, the qSTCH-Set acquisition function evaluates a candidate set $\Xset = \{\mathbf{x}^{(1)}, \ldots, \mathbf{x}^{(q)}\}$ via the expected smooth scalarization utility:
 \begin{equation}
 \label{eq:qstchset}
     \alpha^{\text{qSTCH-Set}}(\Xset) = \E_{\mathbf{f} \sim \GP}\!\left[ -g^{\text{STCH-Set}}_\mu\!\left(\mathbf{f}(\Xset) \mid \boldsymbol{\lambda}\right) \right],
 \end{equation}
-where the expectation is over the joint posterior $\mathbf{f}(\Xset) \in \R^{q \times m}$. The negation converts from STCH-Set's minimization convention to BoTorch's maximization convention. In practice, we approximate with $N$ quasi-Monte Carlo samples via the reparameterization trick~\citep{wilson2018maxvalue,balandat2020botorch}:
+where $g^{\text{STCH-Set}}_\mu$ is the smooth minimax scalarization defined in Eq.~\eqref{eq:stchset}. We approximate the expectation using $N$ quasi-Monte Carlo samples via the reparameterization trick:
 \begin{equation}
 \label{eq:mc}
     \alpha^{\text{qSTCH-Set}}(\Xset) \approx \frac{1}{N} \sum_{n=1}^{N} \left[ -g^{\text{STCH-Set}}_\mu\!\left(\hat{\mathbf{f}}^{(n)}(\Xset) \mid \boldsymbol{\lambda}\right) \right].
 \end{equation}
+Here, $\hat{\mathbf{f}}^{(n)}(\Xset)$ denotes the $n$-th posterior sample of the vector-valued function at the set $\Xset$.
 
-\paragraph{Full differentiability.} Both GP posterior sampling (via reparameterization) and the STCH-Set scalarization (via log-sum-exp) are differentiable, so $\alpha^{\text{qSTCH-Set}}$ admits gradients with respect to $\Xset$ for optimization via L-BFGS-B. This contrasts with qNParEGO's non-smooth Chebyshev scalarization.
+\paragraph{The $K=m$ Design Rule.}
+Standard batch BO methods like qNParEGO select $q$ points sequentially or jointly, often with $q \ll m$ or $q$ fixed arbitrarily. We propose a rigorous coupling:
+\begin{center}
+    \emph{Set the batch size $K$ equal to the number of objectives $m$.}
+\end{center}
+\textbf{Intuition:} The Tchebycheff scalarization with weight vectors near the simplex vertices isolates individual objectives. To approximate the ideal point, the batch must contain at least one candidate specializing in each objective $f_i$. If $K < m$, the set cannot simultaneously cover all $m$ extremal directions of the Pareto front, leading to ``blind spots'' in the acquisition. By setting $K=m$ and using a uniform weight $\boldsymbol{\lambda} = \mathbf{1}/m$, the inner smooth minimum operator $\smin_{k} f_i(\mathbf{x}^{(k)})$ effectively assigns one $\mathbf{x}^{(k)}$ to each $f_i$, enabling the set to descend all objectives in parallel.
 
-\paragraph{Coordinated batch acquisition.} Unlike qNParEGO, which samples independent weight vectors for each batch element, qSTCH-Set optimizes all $q$ candidates jointly. The smooth min operator~\eqref{eq:smin} encourages each candidate to specialize on different objectives, while the smooth max ensures no objective is neglected. This is precisely the ``few-for-many'' coordination mechanism of~\citet{lin2025few}, transferred to the surrogate setting.
+\paragraph{Complexity.}
+The evaluation of $\alpha^{\text{qSTCH-Set}}$ scales as $O(N \cdot K \cdot m)$. With $K=m$, this becomes $O(N m^2)$. While quadratic in $m$, this remains computationally efficient for $m \approx 50$, unlike hypervolume methods which scale as $O(N 2^m)$ or worse. The gradient computation via auto-differentiation shares the same complexity.
 
 \subsection{Practical Considerations}
 \label{sec:practical}
 
-\paragraph{Ideal point.} Estimated as $z_i^* = \min_{j \le t} y_{j,i} - \epsilon$ with $\epsilon = 10^{-4}$.
+\paragraph{Choice of $K$.} While we recommend $K=m$ for balanced exploration, if evaluation budget is strictly limited, one can set $K < m$. In this case, qSTCH-Set will prioritize the subset of objectives that yield the largest marginal utility, but convergence to the full Pareto front may slow.
 
-\paragraph{Weights.} We use uniform $\boldsymbol{\lambda} = \mathbf{1}/m$ by default, encoding balanced coverage across all objectives.
+\paragraph{Smoothing parameter $\mu$.} We use $\mu = 0.01$ to $0.1$. Smaller $\mu$ yields a tighter approximation to the Tchebycheff scalarization but stiffens the gradients. A schedule $\mu_t \to 0$ is theoretically grounded but $\mu$ fixed at $0.1$ works well in practice.
 
-\paragraph{Smoothing parameter.} We fix $\mu = 0.1$ following~\citet{lin2024smooth}. The total approximation gap is bounded by $\mu(\log m + \log K)$; for $m{=}10$, $K{=}5$: gap $\le 0.39$.
-
-\paragraph{MC samples.} We use $N = 256$ Sobol quasi-Monte Carlo base samples by default.
+\paragraph{Weight Sampling vs. Fixed Weights.} Unlike ParEGO/qNParEGO which sample random $\boldsymbol{\lambda}$ at each step, qSTCH-Set uses a \emph{fixed} uniform $\boldsymbol{\lambda} = \mathbf{1}/m$ for the outer scalarization. The diversity comes from the \emph{set} $\Xset$ itself covering the trade-offs, not from randomizing the scalarization target.
 
 \subsection{Algorithm}
 
@@ -215,62 +221,22 @@ Algorithm~\ref{alg:main} summarizes the full qSTCH-Set BO loop.
 \caption{qSTCH-Set: Many-Objective Bayesian Optimization}
 \label{alg:main}
 \begin{algorithmic}[1]
-\REQUIRE Black-box objectives $f_1, \ldots, f_m$; evaluation budget $T$; batch size $q$; smoothing $\mu > 0$; initial data $\D_0$
-\FOR{$t = 0, 1, \ldots, T-1$}
+\REQUIRE Black-box objectives $f_1, \ldots, f_m$; evaluation budget $T$; batch size $K=m$; smoothing $\mu > 0$; initial data $\D_0$
+\FOR{$t = 0, 1, \ldots, T/K-1$}
     \STATE Fit independent GP surrogates $\hat{f}_1, \ldots, \hat{f}_m$ on $\D_t$ \hfill \emph{[Mat\'ern-5/2, MLE]}
     \STATE Estimate ideal point: $z_i^* \leftarrow \min_{j \le t} y_{j,i} - \epsilon$, \; $i = 1, \ldots, m$
     \STATE Set $\boldsymbol{\lambda} \leftarrow \mathbf{1}/m$ \hfill \emph{[uniform coverage]}
     \STATE Draw $N$ quasi-Monte Carlo base samples $\{\boldsymbol{\omega}^{(n)}\}_{n=1}^N$
     \STATE Construct acquisition: $\alpha(\Xset) = \frac{1}{N}\sum_{n=1}^N \left[-g^{\text{STCH-Set}}_\mu(\hat{\mathbf{f}}^{(n)}(\Xset) \mid \boldsymbol{\lambda})\right]$
-    \STATE Solve: $\Xset^* \leftarrow \argmax_{\Xset \subset \X,\, |\Xset|=q} \alpha(\Xset)$ \hfill \emph{[L-BFGS-B, 20 restarts]}
+    \STATE Solve: $\Xset^* \leftarrow \argmax_{\Xset \subset \X,\, |\Xset|=K} \alpha(\Xset)$ \hfill \emph{[L-BFGS-B, 20 restarts]}
     \STATE Evaluate: $\mathbf{y}^{(k)} \leftarrow \mathbf{f}(\mathbf{x}^{(k)})$ for each $\mathbf{x}^{(k)} \in \Xset^*$
-    \STATE Update: $\D_{t+1} \leftarrow \D_t \cup \{(\mathbf{x}^{(k)}, \mathbf{y}^{(k)})\}_{k=1}^{q}$
+    \STATE Update: $\D_{t+1} \leftarrow \D_t \cup \{(\mathbf{x}^{(k)}, \mathbf{y}^{(k)})\}_{k=1}^{K}$
 \ENDFOR
-\RETURN Non-dominated solutions from $\D_T$
+\RETURN Non-dominated solutions from $\D_{final}$
 \end{algorithmic}
 \end{algorithm}
 
-%=============================================================================
-\section{Theoretical Analysis}
-\label{sec:theory}
-%=============================================================================
-
-We analyze the conditions under which the Pareto optimality guarantees of STCH-Set (Theorem~\ref{thm:lin}) transfer to the BO setting. Our main result is a gap decomposition showing that the suboptimality of qSTCH-Set's solutions decomposes cleanly into a \emph{controllable smoothing gap} and a \emph{vanishing uncertainty term}.
-
-\subsection{Approximation Gap Decomposition}
-
-\begin{proposition}[Approximation gap]
-\label{prop:gap}
-Let $\hat{f}_1, \ldots, \hat{f}_m$ be independent GP surrogates with Mat\'ern-$\nu$ kernels ($\nu > 1$) over compact $\X \subset \R^d$. Suppose the GP posterior concentration bound holds: for each $i \in [m]$, $|f_i(\mathbf{x}) - \mu_{i,t}(\mathbf{x})| \le \beta_t^{1/2}\, \sigma_{i,t}(\mathbf{x})$ for all $\mathbf{x} \in \X$ with probability $\ge 1 - \delta$, where $\beta_t = O(d \log t)$~\citep{srinivas2010ucb}. Let $\Xset_t^* = \argmin_{\Xset} g^{\mathrm{STCH\text{-}Set}}_\mu(\boldsymbol{\mu}_t(\Xset) \mid \boldsymbol{\lambda})$ with $\boldsymbol{\lambda} > \mathbf{0}$. Then with probability $\ge 1 - \delta$:
-\begin{equation}
-\label{eq:gap}
-    g^{\mathrm{TCH\text{-}Set}}(\Xset_t^* \mid \boldsymbol{\lambda}) \le g^{\mathrm{STCH\text{-}Set}}_\mu(\boldsymbol{\mu}_t(\Xset_t^*) \mid \boldsymbol{\lambda}) + \underbrace{\mu \log m + \mu \log K}_{\text{smoothing gap}} + \underbrace{2\beta_t^{1/2}\, \bar{\sigma}_t}_{\text{posterior uncertainty}},
-\end{equation}
-where $\bar{\sigma}_t = \max_{i \in [m]} \max_{\mathbf{x} \in \Xset_t^*} \sigma_{i,t}(\mathbf{x})$.
-\end{proposition}
-
-The bound follows from composing three standard results: (i) the log-sum-exp outer approximation gap of $\mu \log m$~\citep{lin2024smooth}, (ii) the smooth-min inner approximation gap of $\mu \log K$~\citep{lin2025few}, and (iii) the GP posterior concentration bound~\citep{srinivas2010ucb} propagated through the Lipschitz STCH-Set objective. A full proof is in Appendix~\ref{app:proof}.
-
-\subsection{Asymptotic Pareto Optimality}
-
-\begin{proposition}[Asymptotic $\varepsilon$-Pareto optimality]
-\label{prop:pareto}
-Under the conditions of Proposition~\ref{prop:gap}, if $\bar{\sigma}_t \to 0$ as $t \to \infty$ (GP posterior consistency), then all solutions in $\Xset_t^*$ are asymptotically $\varepsilon$-Pareto optimal with:
-\begin{equation}
-    \varepsilon_t = \mu\log(mK) + O(\beta_t^{1/2}\,\bar{\sigma}_t) \xrightarrow{t \to \infty} \mu\log(mK).
-\end{equation}
-The residual $\mu\log(mK)$ can be made arbitrarily small by choosing $\mu \to 0$, or eliminated via a $\mu_t = c/\log(t+1)$ annealing schedule.
-\end{proposition}
-
-\begin{proof}[Proof sketch]
-Uniform convergence of $\hat{f}_{i,t} \to f_i$ implies $g^{\text{STCH-Set}}_\mu(\hat{\mathbf{f}}_t(\Xset)) \to g^{\text{STCH-Set}}_\mu(\mathbf{f}(\Xset))$ uniformly by Lipschitz continuity of log-sum-exp. By Berge's maximum theorem on compact $\X^q$, minimizers converge. Theorem~\ref{thm:lin} applies to the limit. \qed
-\end{proof}
-
-\paragraph{Honest assessment.} Propositions~\ref{prop:gap}--\ref{prop:pareto} combine known results (Lin et al.'s approximation bounds + Srinivas et al.'s GP concentration) via standard arguments. They do \emph{not} establish finite-time regret bounds or sample complexity guarantees for qSTCH-Set; such results would require formalizing that L-BFGS-B finds a near-global optimum of the MC acquisition---a gap shared by essentially all BO acquisition function analyses~\citep{daulton2020qnehvi,daulton2021qnehvi,paria2019mobo}. We view the empirical results (\S\ref{sec:experiments}) as the primary evidence for the method's effectiveness.
-
-\subsection{Computational Complexity}
-
-Each evaluation of qSTCH-Set costs $O(NqmC_{\text{GP}})$, where $C_{\text{GP}} = O(t^2)$ is the posterior sampling cost. The scalarization itself is $O(Nqm)$---\emph{linear in $m$}. In contrast, qEHVI requires non-dominated partitioning that scales exponentially in $m$.
+\input{theory_section}
 
 %=============================================================================
 \section{Experiments}
