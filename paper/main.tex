@@ -119,7 +119,7 @@ Our key design rule sets $K{=}m$: one candidate per objective, so that the smoot
     \item We propose \textbf{qSTCH-Set}, the first Monte Carlo acquisition function that applies set-based smooth Tchebycheff scalarization to GP posterior samples for many-objective Bayesian optimization (\S\ref{sec:method}).
     \item We prove that STCH-Set Pareto optimality guarantees transfer asymptotically under GP posterior concentration, with an explicit approximation gap of $\mu\log(mK) + O(\beta_t^{1/2}\bar{\sigma}_t)$ (\S\ref{sec:theory}).
     \item On DTLZ2, qSTCH-Set with $K{=}m$ outperforms qNParEGO by 6.5\% at $m{=}10$ objectives and matches it at $m{=}8$, with the advantage growing as objective dimensionality increases (\S\ref{sec:experiments}).
-    \item We release an open-source BoTorch implementation as a drop-in \texttt{MCAcquisitionFunction} (\S\ref{app:implementation}).
+    \item We release an open-source BoTorch implementation as a drop-in \texttt{MCAcquisitionFunction} (\S\ref{app:implementation-full}).
 \end{enumerate}
 
 %=============================================================================
@@ -424,7 +424,7 @@ Several directions are ripe for future work. \emph{Proving $K > 1$ consistency} 
 %=============================================================================
 \section*{Acknowledgments}
 %=============================================================================
-\placeholder{Acknowledgments: Compute resources provided by the Digital Research Alliance of Canada (Nibi cluster). R.A.V.-H.\ acknowledges funding from [grant details].}
+Compute resources were provided by the Digital Research Alliance of Canada (Nibi cluster). R.A.V.-H.\ acknowledges support from the Natural Sciences and Engineering Research Council of Canada (NSERC) and McMaster University.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
