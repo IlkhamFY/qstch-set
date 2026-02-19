@@ -1,8 +1,11 @@
 """
-STCH-BoTorch: Smooth Tchebycheff scalarization for multi-objective Bayesian optimization.
+STCH-BoTorch: Smooth Tchebycheff Set scalarization for many-objective Bayesian optimization.
 
-This package provides differentiable alternatives to standard Tchebycheff scalarization
-for use with BoTorch acquisition functions.
+Provides qSTCH-Set, a Monte Carlo acquisition function that jointly optimizes batches of
+candidates for collective Pareto coverage using Smooth Tchebycheff Set scalarization.
+Scales to 10+ objectives in O(Km) time with no hypervolume computation.
+
+See: https://github.com/IlkhamFY/stch-botorch
 """
 
 __version__ = "0.1.0"

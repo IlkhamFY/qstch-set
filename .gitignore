@@ -106,3 +106,13 @@ dmypy.json
 .DS_Store
 Thumbs.db
 
+# Log files
+*.log
+
+# SLURM logs
+slurm/logs/
+
+# Benchmark stdout/stderr logs
+benchmarks/results/*.log
+benchmarks/results/run_log.txt
+
