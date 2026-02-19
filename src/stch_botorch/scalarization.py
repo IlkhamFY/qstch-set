@@ -190,25 +190,18 @@ def smooth_chebyshev_set(
             f"got {weights.shape[-1]}"
         )
 
-    # Compute weighted deviations for each candidate k and objective i
-    # R_ik = w_i * (y_ik - z*_i)
-    # Per Lin et al. ICLR 2025 Eq. 12
-    # Shape: (..., q, m)
-    R_ik = weights * (Y - ref_point)
-
     # Inner aggregation: Smooth min over batch (dim=-2, the q dimension)
-    # R_i^{min} = -mu * logsumexp(-R_ik / mu, dim=-2)
+    # inner = -mu * logsumexp(-f_values / mu)
     # Shape: (..., m)
-    R_i_min = -mu * torch.logsumexp(-R_ik / mu, dim=-2)
+    inner = -mu * torch.logsumexp(-Y / mu, dim=-2)
 
     # Outer aggregation: Smooth max over objectives (dim=-1, the m dimension)
-    # S = mu * logsumexp(R_i^{min} / mu, dim=-1)
+    # S = mu * logsumexp(weights * (inner - z*) / mu)
     # Shape: (...)
-    S = mu * torch.logsumexp(R_i_min / mu, dim=-1)
+    S = mu * torch.logsumexp(weights * (inner - ref_point) / mu, dim=-1)
 
     # Return negative for maximization (BoTorch maximizes utility)
     # Utility = -S
     utility = -S
 
     return utility
-
