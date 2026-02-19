@@ -381,6 +381,13 @@ However, both methods require cheap, differentiable objectives.
 Pires \& Coelho~\citep{pires2025stch} brought single-point STCH into composite Bayesian optimization~\citep{astudillo2019composite}, achieving smooth scalarization in the surrogate-driven loop but without set-based coordination.
 Our qSTCH-Set completes this picture: it combines set-based STCH scalarization with Monte Carlo GP posterior sampling, operating at $O(Km)$ cost in the sample-efficient regime where objectives are expensive black-box functions.
 
+\paragraph{Two-stage generative MOBO.}
+Sorourifar et al.~\citep{paulson2025qpmhi} propose a modular ``generate-then-optimize'' framework for \emph{discrete} molecular design: a generative model first proposes a large candidate pool, after which qPMHI (Probability of Maximum Hypervolume Improvement) selects the optimal batch by ranking candidates via their probability of inducing the largest Pareto front expansion.
+Because qPMHI decomposes additively over candidates, batch selection reduces to a simple sort-and-take-top-$q$ operation.
+This framework is well-suited to discrete chemical spaces, where gradient-based acquisition optimization over inputs is unavailable.
+In contrast, qSTCH-Set targets \emph{continuous} input spaces where end-to-end gradient flow is possible: rather than scoring a pre-generated pool, it jointly optimizes $K$ candidates through a single differentiable acquisition function, coupling them via shared GP posterior samples to ensure coordinated Pareto front coverage.
+The two methods are thus complementary: qPMHI for discrete molecular libraries, qSTCH-Set for continuous BO.
+
 \paragraph{Many-objective evolutionary optimization.}
 Evolutionary algorithms such as NSGA-III~\citep{deb2014nsga3} and MOEA/D~\citep{zhang2007moead} handle many objectives effectively but typically require thousands of function evaluations, making them unsuitable for expensive black-box problems where each evaluation may cost hours or days.
 
