@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import gc
 import json
 import os
 import sys
@@ -88,9 +89,11 @@ def get_opt_params(m: int):
     if m <= 3:
         return dict(num_restarts=10, raw_samples=256, mc_samples=128, maxiter=100)
     elif m <= 5:
-        return dict(num_restarts=20, raw_samples=512, mc_samples=256, maxiter=150)
+        return dict(num_restarts=4, raw_samples=64, mc_samples=64, maxiter=50)
+    elif m <= 8:
+        return dict(num_restarts=6, raw_samples=128, mc_samples=64, maxiter=80)
     else:
-        return dict(num_restarts=32, raw_samples=1024, mc_samples=256, maxiter=200)
+        return dict(num_restarts=4, raw_samples=64, mc_samples=32, maxiter=30)
 
 
 # ---------------------------------------------------------------------------
@@ -195,8 +198,7 @@ def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1):
         hv_history.append(hv)
         times.append(t1 - t0)
 
-        if (i + 1) % 5 == 0:
-            print(f"  STCH-Set(q={q},mu={mu}) iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s")
+        print(f"  STCH-Set(q={q},mu={mu}) iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s", flush=True)
 
     return hv_history, times, errors
 
@@ -435,12 +437,22 @@ def main():
         default=["stch_set", "stch_nparego", "qnparego", "qehvi", "random"],
     )
     parser.add_argument("--output", default=None)
+    parser.add_argument("--output-dir", default=None, help="Directory for output (overrides --output)")
+    parser.add_argument("--seed-offset", type=int, default=0, help="Offset for seed range (for SLURM array jobs)")
+    parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"], help="Device for torch tensors")
     args = parser.parse_args()
+
+    # Device setup
+    if args.device == "cuda" and torch.cuda.is_available():
+        torch.set_default_device("cuda")
+        print(f"Using CUDA: {torch.cuda.get_device_name(0)}")
+    elif args.device == "cuda":
+        print("WARNING: CUDA requested but not available, falling back to CPU")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     print(f"DTLZ Benchmark v2: {args.problem} m={args.m}, seeds={args.seeds}, "
           f"iters={args.iters}, K={args.K}, mu={args.mu}")
-    print(f"Ablation: {args.ablation}")
+    print(f"Ablation: {args.ablation}, seed_offset={args.seed_offset}")
 
     problem, d, ref_point = get_problem(args.problem, args.m)
     n_init = 2 * (d + 1)
@@ -528,8 +540,9 @@ def main():
         all_times = []
         all_errors = []
 
-        for seed in range(args.seeds):
-            print(f"\n  Seed {seed+1}/{args.seeds}")
+        for seed_idx in range(args.seeds):
+            seed = seed_idx + args.seed_offset
+            print(f"\n  Seed {seed} (idx {seed_idx+1}/{args.seeds})")
             try:
                 hv_history, times, errors = cfg["fn"](seed)
                 all_hv.append(hv_history)
@@ -562,9 +575,15 @@ def main():
                   f"errors={sum(len(e) for e in all_errors)}")
 
     # Save
-    output_path = args.output or (
-        f"benchmarks/results/{args.problem}_m{args.m}_{args.ablation}_{timestamp}.json"
-    )
+    if args.output_dir:
+        output_path = os.path.join(
+            args.output_dir,
+            f"{args.problem}_m{args.m}_{args.ablation}_seed{args.seed_offset}_{timestamp}.json"
+        )
+    else:
+        output_path = args.output or (
+            f"benchmarks/results/{args.problem}_m{args.m}_{args.ablation}_{timestamp}.json"
+        )
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
