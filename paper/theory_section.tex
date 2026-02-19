@@ -1,0 +1,484 @@
+%=============================================================================
+% THEORY SECTION — Hardened version with rigorous propositions
+% Drop into main.tex as \section{Theoretical Analysis}
+% Requires: amsmath, amssymb, amsthm (or neurips theorem environments)
+%
+% COMPILE NOTE: Ensure the following are in the preamble of main.tex:
+%   \newtheorem{proposition}{Proposition}
+%   \newtheorem{corollary}{Corollary}
+%   \newtheorem{conjecture}{Conjecture}
+%   \newtheorem{remark}{Remark}
+%   \theoremstyle{definition}
+%   \newtheorem{definition}{Definition}
+%   \newtheorem{assumption}{Assumption}
+%=============================================================================
+
+\section{Theoretical Analysis}
+\label{sec:theory}
+
+We establish the theoretical properties of qSTCH-Set as a BO acquisition function.
+We distinguish sharply between results that follow rigorously from existing theory
+(Propositions~\ref{prop:valid}--\ref{prop:pareto-transfer}),
+and those that remain conjectural (Conjecture~\ref{conj:consistency}).
+Throughout, $\X \subset \R^d$ is compact and $f_1,\ldots,f_m:\X\to\R$ are the true (unknown) objectives.
+
+%--------------------------------------------------------------------
+\subsection{Definitions}
+\label{sec:theory-defs}
+%--------------------------------------------------------------------
+
+\begin{definition}[Pareto optimality]
+\label{def:pareto}
+A point $\mathbf{x}\in\X$ is \emph{weakly Pareto optimal} if there is no $\mathbf{x}'\in\X$
+with $f_i(\mathbf{x}') < f_i(\mathbf{x})$ for every $i\in[m]$.
+It is \emph{Pareto optimal} if there is no $\mathbf{x}'\in\X$
+with $f_i(\mathbf{x}') \le f_i(\mathbf{x})$ for all $i$ and $f_j(\mathbf{x}') < f_j(\mathbf{x})$
+for some $j$.
+\end{definition}
+
+\begin{definition}[$\varepsilon$-Pareto optimality]
+\label{def:eps-pareto}
+A point $\mathbf{x}\in\X$ is \emph{$\varepsilon$-Pareto optimal} (for $\varepsilon\ge 0$)
+if there is no $\mathbf{x}'\in\X$ with $f_i(\mathbf{x}') \le f_i(\mathbf{x}) - \varepsilon$ for every $i\in[m]$.
+\end{definition}
+
+\begin{definition}[Smooth Tchebycheff Set scalarization]
+\label{def:stchset}
+For a candidate set $\Xset = \{\mathbf{x}^{(1)},\ldots,\mathbf{x}^{(K)}\}\subset\X$,
+preference vector $\boldsymbol{\lambda}\in\Delta^{m-1}_{++}$
+($\lambda_i>0$, $\sum_i \lambda_i=1$),
+reference point $\mathbf{z}^*\in\R^m$, and smoothing parameter $\mu>0$:
+\begin{align}
+g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset\mid\boldsymbol{\lambda})
+&= \mu\log\!\left(\sum_{i=1}^{m}\exp\!\left(
+    \frac{\lambda_i\bigl(\smin_\mu^{(k)} f_i(\mathbf{x}^{(k)}) - z_i^*\bigr)}{\mu}
+\right)\right), \label{eq:stchset-def}\\
+\text{where}\quad
+\smin_\mu^{(k)} f_i(\mathbf{x}^{(k)})
+&= -\mu\log\!\left(\sum_{k=1}^{K}\exp\!\left(-\frac{f_i(\mathbf{x}^{(k)})}{\mu}\right)\right).
+\label{eq:smin-def}
+\end{align}
+The outer log-sum-exp is a smooth approximation to $\max_{i}$; the inner negative
+log-sum-exp of negatives is a smooth approximation to $\min_{k}$.
+\end{definition}
+
+\begin{definition}[qSTCH-Set acquisition function]
+\label{def:qstchset}
+Given GP posteriors $\hat{f}_1^{(t)},\ldots,\hat{f}_m^{(t)}$ after $t$ observations,
+the \emph{qSTCH-Set acquisition function} for a candidate set $\Xset$ is:
+\begin{equation}
+\label{eq:acq}
+\alpha_t^{\mathrm{qSTCH}}(\Xset)
+= \E_{\boldsymbol{\omega}}\!\left[
+    -g_\mu^{\mathrm{STCH\text{-}Set}}\!\left(
+        \hat{\mathbf{f}}_\omega^{(t)}(\Xset)\mid\boldsymbol{\lambda}
+    \right)
+\right],
+\end{equation}
+where $\hat{\mathbf{f}}_\omega^{(t)}$ denotes a joint posterior sample path (indexed by
+base sample $\boldsymbol{\omega}$), obtained via the reparameterization trick.
+In practice, the expectation is approximated by $N$ quasi-Monte Carlo base samples.
+\end{definition}
+
+%--------------------------------------------------------------------
+\subsection{Proposition 1: qSTCH-Set Is a Valid MC Acquisition Function}
+\label{sec:theory-prop1}
+%--------------------------------------------------------------------
+
+\begin{proposition}[Validity as MC acquisition function]
+\label{prop:valid}
+The qSTCH-Set acquisition function $\alpha_t^{\mathrm{qSTCH}}(\Xset)$
+defined in~\eqref{eq:acq} satisfies the following:
+\begin{enumerate}
+    \item[\textnormal{(a)}] \textbf{Measurability.}
+        For every fixed $\Xset\in\X^K$, the integrand
+        $\omega\mapsto -g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset)\mid\boldsymbol{\lambda})$
+        is a Borel-measurable function of the base samples~$\boldsymbol{\omega}$.
+    \item[\textnormal{(b)}] \textbf{Finite expectation.}
+        If the GP posteriors have bounded support on any compact $\Xset\subset\X^K$
+        (which holds almost surely for GPs with continuous kernels on compact domains),
+        then $\E[|\alpha_t^{\mathrm{qSTCH}}(\Xset)|]<\infty$.
+    \item[\textnormal{(c)}] \textbf{Differentiability.}
+        $\alpha_t^{\mathrm{qSTCH}}(\Xset)$ is differentiable with respect to
+        $\Xset = (\mathbf{x}^{(1)},\ldots,\mathbf{x}^{(K)}) \in \X^K$,
+        with gradients computable via the reparameterization trick and automatic differentiation.
+        Specifically, for each $\mathbf{x}^{(k)}$:
+        \begin{equation}
+        \label{eq:grad}
+        \nabla_{\mathbf{x}^{(k)}}\, g_\mu^{\mathrm{STCH\text{-}Set}}
+        = \sum_{i=1}^m w_i \cdot p_{ik}\cdot \nabla f_i(\mathbf{x}^{(k)}),
+        \end{equation}
+        where the softmax attention weights are
+        \begin{equation}
+        \label{eq:weights}
+        w_i = \frac{\exp\!\bigl(\lambda_i(R_i^{\min}-z_i^*)/\mu\bigr)}
+              {\sum_j \exp\!\bigl(\lambda_j(R_j^{\min}-z_j^*)/\mu\bigr)},\quad
+        p_{ik} = \frac{\exp\!\bigl(-f_i(\mathbf{x}^{(k)})/\mu\bigr)}
+              {\sum_\ell \exp\!\bigl(-f_i(\mathbf{x}^{(\ell)})/\mu\bigr)},
+        \end{equation}
+        with $R_i^{\min} = \smin_\mu^{(k)} f_i(\mathbf{x}^{(k)})$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+\textbf{(a)}
+The GP posterior sample paths $\hat{f}_{i,\omega}^{(t)}(\mathbf{x})$ are constructed
+via the reparameterization trick as $\hat{f}_{i,\omega}^{(t)}(\mathbf{x})
+= \mu_i^{(t)}(\mathbf{x}) + L_i^{(t)}(\mathbf{x})\,\omega_i$,
+where $L_i^{(t)}$ is obtained from the Cholesky decomposition of the posterior covariance
+(or, in the pathwise conditioning approach~\cite{wilson2018maxvalue},
+from a basis-function representation).
+In either case, for fixed $\mathbf{x}$, the map
+$\omega_i\mapsto \hat{f}_{i,\omega}^{(t)}(\mathbf{x})$ is an affine function
+of standard normal random variables, hence Borel-measurable.
+The STCH-Set scalarization~\eqref{eq:stchset-def} is a composition of
+$\exp$, $\log$, $\sum$, and scalar multiplication applied to these measurable functions.
+Since compositions and finite sums of measurable functions are measurable,
+the integrand is Borel-measurable.
+
+\textbf{(b)}
+On the compact set $\X$, any GP with a continuous kernel
+$k_i:\X\times\X\to\R$ has sample paths that are almost surely
+continuous, and hence bounded on $\X$ (continuous functions on compact sets
+are bounded; see~\cite{rasmussen2006gp}, \S4.1).
+Let $M = \max_{i,k,\omega}|\hat{f}_{i,\omega}^{(t)}(\mathbf{x}^{(k)})|<\infty$ a.s.
+Then $|g_\mu^{\mathrm{STCH\text{-}Set}}|\le |M| + |z_{\max}^*| + \mu\log m$,
+where $z_{\max}^* = \max_i|z_i^*|$. Hence the expectation is finite.
+
+\textbf{(c)}
+The STCH-Set scalarization~\eqref{eq:stchset-def} is a composition
+of $C^\infty$ functions ($\exp$, $\log$, affine maps) with strictly positive arguments
+inside the $\log$ (since each summand $\exp(\cdot)>0$). By the chain rule,
+$g_\mu^{\mathrm{STCH\text{-}Set}}$ is $C^\infty$ with respect to its arguments
+$\{f_i(\mathbf{x}^{(k)})\}_{i,k}$.
+
+The gradient~\eqref{eq:grad} follows by direct computation.
+Applying the chain rule to the outer log-sum-exp yields the
+softmax weights $w_i$ (attention over objectives). Applying the chain rule
+to the inner negative log-sum-exp yields the softmin weights $p_{ik}$
+(attention over candidates for each objective).
+The product $w_i \cdot p_{ik}$ determines how strongly objective $i$
+influences the movement of candidate $\mathbf{x}^{(k)}$.
+
+Since the reparameterization trick
+expresses $\hat{f}_{i,\omega}^{(t)}(\mathbf{x})$ as a differentiable function
+of $\mathbf{x}$ (for kernels with differentiable mean and covariance functions,
+such as Mat\'ern with $\nu>1$ or the squared exponential), the
+composition $g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}_\omega^{(t)}(\Xset))$
+is differentiable in $\Xset$ for each $\omega$, and the expectation~\eqref{eq:acq}
+can be differentiated under the integral sign
+(by dominated convergence, using the a.s.\ boundedness from part~(b)
+and the Lipschitz continuity of the gradient).
+\end{proof}
+
+\begin{remark}[Comparison to non-smooth Chebyshev]
+The classical Tchebycheff scalarization~\eqref{eq:tch} uses a hard $\max$,
+which is non-differentiable when two or more objectives tie.
+This prevents direct use of the reparameterization trick for MC gradient estimation
+in BoTorch.
+The STCH-Set formulation resolves this entirely: $\alpha_t^{\mathrm{qSTCH}}$
+is $C^\infty$ for all $\mu>0$, enabling standard L-BFGS-B acquisition optimization.
+This is in contrast to qNParEGO~\cite{daulton2020qnehvi,knowles2006parego},
+which uses the augmented Chebyshev scalarization with hard $\max$
+and requires heuristic smoothing or restart strategies.
+\end{remark}
+
+%--------------------------------------------------------------------
+\subsection{Proposition 2: Pareto Optimality of Acquisition Maximizers}
+\label{sec:theory-prop2}
+%--------------------------------------------------------------------
+
+The following result transfers the Pareto optimality guarantee of Lin et al.~\cite{lin2025few}
+from the gradient-based setting to the BO posterior.
+
+\begin{assumption}[GP surrogate regularity]
+\label{asm:gp}
+Each $f_i$ is modeled by an independent GP with a continuous positive-definite kernel
+$k_i$ on the compact domain $\X\subset\R^d$.
+The posterior mean $\mu_i^{(t)}$ and variance $(\sigma_i^{(t)})^2$ are computed
+from $t$ (possibly noisy) observations.
+\end{assumption}
+
+\begin{proposition}[Pareto optimality under the posterior]
+\label{prop:pareto-transfer}
+Let Assumption~\ref{asm:gp} hold, and let $\boldsymbol{\lambda}\in\Delta^{m-1}_{++}$.
+Define the \emph{posterior-mean STCH-Set scalarization}:
+\begin{equation}
+\label{eq:posterior-stchset}
+\hat{g}_\mu^{(t)}(\Xset\mid\boldsymbol{\lambda})
+:= g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset\mid\boldsymbol{\lambda})\big|_{f_i=\mu_i^{(t)}}.
+\end{equation}
+Then:
+\begin{enumerate}
+    \item[\textnormal{(a)}]
+    \textbf{Surrogate Pareto optimality.}
+    If $\Xset^*=\arg\min_{\Xset\in\X^K}\hat{g}_\mu^{(t)}(\Xset\mid\boldsymbol{\lambda})$,
+    then every $\mathbf{x}^{(k)}\in\Xset^*$ is weakly Pareto optimal
+    with respect to the posterior means $(\mu_1^{(t)},\ldots,\mu_m^{(t)})$.
+    If additionally $\Xset^*$ is unique, every $\mathbf{x}^{(k)}\in\Xset^*$
+    is Pareto optimal w.r.t.\ $(\mu_1^{(t)},\ldots,\mu_m^{(t)})$.
+
+    \item[\textnormal{(b)}]
+    \textbf{Approximation bound.}
+    The smooth scalarization satisfies the sandwich inequality:
+    \begin{equation}
+    \label{eq:sandwich}
+    g^{\mathrm{TCH\text{-}Set}}(\Xset\mid\boldsymbol{\lambda})
+    \;\le\;
+    g_\mu^{\mathrm{STCH\text{-}Set}}(\Xset\mid\boldsymbol{\lambda})
+    \;\le\;
+    g^{\mathrm{TCH\text{-}Set}}(\Xset\mid\boldsymbol{\lambda}) + \mu\log m + \mu\log K.
+    \end{equation}
+    The smoothing gap $\mu\log(m) + \mu\log(K)$ is uniform over $\Xset$
+    and controlled by the user-chosen~$\mu$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+\textbf{(a)}
+The GP posterior means $\mu_1^{(t)},\ldots,\mu_m^{(t)}$ are $C^\infty$ functions
+$\X\to\R$ (for any standard kernel with $C^\infty$ realizations, such as the
+squared exponential; for Mat\'ern-$\nu$, $\mu_i^{(t)}$ is at least $C^{\lceil\nu\rceil}$).
+In particular, they satisfy the differentiability requirements of
+Theorem~2 in~\cite{lin2025few}.
+Since $\lambda_i>0$ for all $i$ (by the choice $\boldsymbol{\lambda}\in\Delta_{++}^{m-1}$),
+all hypotheses of~\cite[Theorem~2]{lin2025few} are satisfied with
+the ``objectives'' taken to be $\mu_1^{(t)},\ldots,\mu_m^{(t)}$.
+The conclusion follows directly: all solutions in $\Xset^*$ are weakly Pareto optimal
+w.r.t.\ the surrogate objectives, and Pareto optimal when $\Xset^*$ is unique.
+
+\textbf{(b)}
+The lower bound follows because log-sum-exp
+upper-bounds the max: for any $a_1,\ldots,a_m\in\R$ and $\mu>0$,
+$\max_i a_i \le \mu\log(\sum_i e^{a_i/\mu})$.
+
+For the upper bound, we decompose the smoothing error into two terms:
+\begin{itemize}
+\item \emph{Outer (smax vs.\ max):}
+$\mu\log(\sum_i e^{a_i/\mu}) \le \max_i a_i + \mu\log m$.
+This is the standard log-sum-exp bound (Proposition~3.4 of~\cite{lin2024smooth}).
+\item \emph{Inner (smin vs.\ min):}
+For each $i$, $\min_k b_k - \mu\log K \le \smin_\mu^{(k)} b_k \le \min_k b_k$.
+This follows from the analogous bound for the smooth minimum:
+$-\mu\log(\sum_k e^{-b_k/\mu}) \le \min_k b_k$ (immediate) and
+$\min_k b_k - \mu\log K \le -\mu\log(\sum_k e^{-b_k/\mu})$
+(since $\sum_k e^{-b_k/\mu} \le K \cdot e^{-\min_k b_k/\mu}$).
+\end{itemize}
+The inner error contributes at most $\mu\log K$ to each term inside the outer
+log-sum-exp. Since $\boldsymbol{\lambda}\in\Delta^{m-1}$ (i.e., $\sum_i\lambda_i=1$),
+the per-objective shift of at most $\mu\log K$ translates to an additive error
+of at most $\mu\log K$ in the outer scalarization.
+Combining: $g_\mu^{\mathrm{STCH\text{-}Set}} \le g^{\mathrm{TCH\text{-}Set}} + \mu\log m + \mu\log K$.
+\end{proof}
+
+\begin{corollary}[Asymptotic quality with $\mu$-annealing]
+\label{cor:annealing}
+If the smoothing parameter is reduced as $\mu_t = c/\log(t+1)$ for a constant $c>0$,
+then the smoothing gap satisfies
+$\mu_t\log(mK)\to 0$ as $t\to\infty$.
+Thus, assuming part~(a) continues to hold (i.e., the STCH-Set optimization finds a
+global minimizer), the solutions converge in scalarization value to the true
+TCH-Set optimum.
+\end{corollary}
+
+\begin{remark}[Scope of Proposition~\ref{prop:pareto-transfer}]
+\label{rem:scope}
+Part~(a) is a \emph{surrogate-space} guarantee: it says the acquisition function
+searches in the right part of the Pareto front of the \emph{model}.
+It does \emph{not} directly imply Pareto optimality of the true objectives $\mathbf{f}$,
+because the GP posterior mean $\mu_i^{(t)}$ may differ from $f_i$.
+Bridging the gap requires posterior convergence, which we address in
+Conjecture~\ref{conj:consistency} below.
+Note that this surrogate-space guarantee is the same type of guarantee
+enjoyed by all model-based BO methods (e.g., qEHVI optimizes hypervolume
+of the \emph{posterior}, not the true Pareto front).
+\end{remark}
+
+%--------------------------------------------------------------------
+\subsection{Conjecture 3: Consistency Under GP Posterior Convergence}
+\label{sec:theory-conj}
+%--------------------------------------------------------------------
+
+We now state the key question: \emph{Does qSTCH-Set BO converge to the true Pareto front
+as the number of observations grows?}
+For the $K=1$ case, this reduces to composite BO with a smooth scalarization,
+for which consistency follows from Astudillo \& Frazier~\cite{astudillo2019composite}.
+The $K>1$ case is novel and requires additional arguments that we have not
+been able to complete rigorously. We state it as a conjecture with supporting
+intuition.
+
+\begin{assumption}[RKHS regularity]
+\label{asm:rkhs}
+Each $f_i$ lies in the RKHS $\mathcal{H}_{k_i}$ of its kernel $k_i$,
+with $\|f_i\|_{\mathcal{H}_{k_i}}\le B$.
+The kernels satisfy $k_i(\mathbf{x},\mathbf{x})\le 1$ for all $\mathbf{x}\in\X$.
+\end{assumption}
+
+\begin{assumption}[Observation model]
+\label{asm:obs}
+Observations are $y_{i,t} = f_i(\mathbf{x}_t) + \varepsilon_{i,t}$
+where $\varepsilon_{i,t}$ are i.i.d.\ $\sigma$-sub-Gaussian.
+\end{assumption}
+
+\begin{conjecture}[Consistency of qSTCH-Set BO]
+\label{conj:consistency}
+Under Assumptions~\ref{asm:gp}--\ref{asm:obs}, suppose the qSTCH-Set acquisition
+function~\eqref{eq:acq} is optimized at each BO iteration $t$ with
+$\boldsymbol{\lambda}\in\Delta^{m-1}_{++}$ and $\mu>0$ (possibly decreasing in $t$).
+Let $\Xset_t^*$ denote the set selected at iteration $t$.
+Then, as $t\to\infty$, with probability at least $1-\delta$, every
+$\mathbf{x}^{(k)}\in\Xset_t^*$ is $\varepsilon_t$-Pareto optimal for the true
+objectives $\mathbf{f}$, where
+\begin{equation}
+\label{eq:eps-rate}
+\varepsilon_t = \mu_t\log(mK) + O\!\left(\beta_t^{1/2}\,\bar{\sigma}_t\right)
+\xrightarrow{t\to\infty} 0
+\end{equation}
+if $\mu_t\to 0$ at an appropriate rate.
+Here $\beta_t = O(B^2 + \gamma_t\log^3(t/\delta))$,
+$\gamma_t$ is the maximum information gain of the kernel,
+and $\bar{\sigma}_t = \max_{i\in[m]}\max_{\mathbf{x}\in\Xset_t^*}\sigma_i^{(t)}(\mathbf{x})$.
+\end{conjecture}
+
+\paragraph{Why we believe this but cannot prove it.}
+The argument would need to combine three ingredients:
+
+\begin{enumerate}
+\item \textbf{GP posterior concentration (established).}
+Under Assumptions~\ref{asm:rkhs}--\ref{asm:obs}, Srinivas et al.~\cite{srinivas2010ucb}
+(Theorem~6) provide uniform confidence bounds:
+with probability $\ge 1-\delta/m$ (union-bounded over objectives),
+$|f_i(\mathbf{x})-\mu_i^{(t)}(\mathbf{x})|\le\beta_t^{1/2}\sigma_i^{(t)}(\mathbf{x})$
+simultaneously for all $\mathbf{x}\in\X$ and $t\ge 1$.
+The information gain $\gamma_t$ grows sub-linearly for standard kernels
+(e.g., $\gamma_t = O((\log t)^{d+1})$ for the SE kernel), ensuring
+$\beta_t^{1/2}\sigma_i^{(t)}(\mathbf{x})\to 0$ in well-explored regions.
+
+\item \textbf{STCH-Set Lipschitz stability (straightforward but not formalized).}
+The STCH-Set scalarization is Lipschitz in its objective values.
+Let $L_\mu$ denote the Lipschitz constant of $g_\mu^{\mathrm{STCH\text{-}Set}}$
+with respect to the objective vector $\bigl(f_i(\mathbf{x}^{(k)})\bigr)_{i,k}$
+in the $\ell^\infty$ norm. Then, under the GP concentration event,
+\begin{equation}
+\bigl|g_\mu^{\mathrm{STCH\text{-}Set}}(\hat{\mathbf{f}}^{(t)}(\Xset))
+ - g_\mu^{\mathrm{STCH\text{-}Set}}(\mathbf{f}(\Xset))\bigr|
+\le L_\mu \cdot \beta_t^{1/2}\bar{\sigma}_t.
+\end{equation}
+A bound $L_\mu \le 2$ (with our normalization $\boldsymbol{\lambda}\in\Delta^{m-1}$)
+can be obtained from the fact that both the log-sum-exp and
+negative-log-sum-exp-of-negatives have gradient entries summing to~1,
+but we have not verified all corner cases for the composition rigorously.
+
+\item \textbf{Acquisition optimization is near-global (not provable in general).}
+A complete consistency proof requires that the acquisition function is optimized to
+within $\varepsilon$ of the global optimum at each step. This is assumed
+(explicitly or implicitly) in all GP-based BO analyses, including GP-UCB~\cite{srinivas2010ucb},
+EI~\cite{balandat2020botorch}, and composite BO~\cite{astudillo2019composite}.
+In practice, multi-start L-BFGS-B provides this empirically but it is
+not formally guaranteed for the non-convex acquisition landscape of qSTCH-Set
+with $K>1$ candidates (the decision space $\X^K$ has dimension $Kd$).
+\end{enumerate}
+
+\paragraph{The $K=1$ case.}
+When $K=1$, qSTCH-Set reduces to single-point STCH scalarization composed with the GP posterior.
+This falls within the composite BO framework of Astudillo \& Frazier~\cite{astudillo2019composite},
+who prove consistency for acquisition functions of the form $h(\mathbf{g}(\mathbf{x}))$
+where $h$ is a known function and $\mathbf{g}$ is modeled by a GP.
+In our case, $h = -g_\mu^{\mathrm{STCH}}$ and $\mathbf{g} = (f_1,\ldots,f_m)$.
+Their Theorem~1 establishes that the composite EI acquisition function
+is consistent (i.e., the optimization gap vanishes) under GP posterior consistency.
+For $K=1$, our method inherits this guarantee directly.
+
+\paragraph{The $K>1$ gap.}
+For $K>1$, the decision variable is a \emph{set} $\Xset\in\X^K$,
+and the scalarization $g_\mu^{\mathrm{STCH\text{-}Set}}$ involves a smooth minimum
+over the $K$ candidate evaluations.
+The composite BO framework of~\cite{astudillo2019composite} does not directly cover this case
+because:
+(i) the ``outer function'' $h$ now depends on the GP outputs at $K$ different input locations
+jointly, not at a single $\mathbf{x}$; and
+(ii) the set-valued optimization introduces symmetries and redundancies
+(permutation invariance of $\Xset$) that complicate the convergence analysis.
+Extending the Astudillo-Frazier consistency argument to this joint-set
+setting is the main open theoretical challenge.
+We conjecture it holds by analogy: the STCH-Set scalarization is continuous
+and the GP posterior concentrates uniformly, so the set-valued optimization
+problem should converge to its deterministic counterpart.
+A rigorous proof would likely require set-valued epi-convergence arguments
+(see, e.g., Rockafellar \& Wets, \emph{Variational Analysis}, Chapter~7).
+
+%--------------------------------------------------------------------
+\subsection{Computational Complexity}
+\label{sec:theory-complexity}
+%--------------------------------------------------------------------
+
+\begin{proposition}[Per-evaluation complexity]
+\label{prop:complexity}
+The qSTCH-Set acquisition function with $K$ candidate points, $m$ objectives,
+and $N$ MC base samples can be evaluated in $O(NKm)$ time
+(excluding GP posterior sampling cost) and $O(Km)$ space per MC sample.
+In contrast:
+\begin{itemize}
+    \item \emph{qEHVI}~\cite{daulton2020qnehvi,daulton2021qnehvi}:
+        Hypervolume computation is $\#P$-hard in $m$; the best exact algorithms
+        require time exponential in $m$ in the worst case.
+    \item \emph{qNParEGO}~\cite{knowles2006parego,daulton2020qnehvi}:
+        $O(Nm)$ per evaluation (linear in $m$), but uses a single
+        random $\boldsymbol{\lambda}$ per iteration without coordinating solutions.
+\end{itemize}
+\end{proposition}
+
+\begin{proof}
+The STCH-Set computation~\eqref{eq:stchset-def}--\eqref{eq:smin-def} requires:
+(1)~weighted deviations $\lambda_i(f_i(\mathbf{x}^{(k)})-z_i^*)/\mu$ for all $i\in[m]$,
+$k\in[K]$: $O(Km)$ operations;
+(2)~smooth min via $\mathrm{logsumexp}$ over $k$ for each $i$: $O(K)$ per objective,
+$O(Km)$ total;
+(3)~smooth max via $\mathrm{logsumexp}$ over $i$: $O(m)$.
+The gradient~\eqref{eq:grad} can be computed by automatic differentiation
+with the same asymptotic cost (using the PyTorch \texttt{logsumexp} implementation,
+which applies the max-subtraction trick for numerical stability).
+Summing over $N$ MC samples gives $O(NKm)$.
+\end{proof}
+
+%--------------------------------------------------------------------
+\subsection{Summary of Theoretical Status}
+\label{sec:theory-summary}
+%--------------------------------------------------------------------
+
+Table~\ref{tab:theory-status} summarizes what is proved, what is transferred from
+existing results, and what remains conjectural.
+
+\begin{table}[t]
+\caption{Theoretical status of qSTCH-Set results.}
+\label{tab:theory-status}
+\centering
+\small
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Result} & \textbf{Status} & \textbf{Key Dependency} \\
+\midrule
+Prop.~\ref{prop:valid}: Valid MC acquisition
+    & Proved
+    & Composition of measurable/smooth functions \\
+Prop.~\ref{prop:pareto-transfer}(a): Surrogate Pareto opt.
+    & Proved (transfer)
+    & Lin et al.~\cite{lin2025few}, Theorem~2 \\
+Prop.~\ref{prop:pareto-transfer}(b): Sandwich bound
+    & Proved
+    & Standard log-sum-exp bounds~\cite{lin2024smooth} \\
+Cor.~\ref{cor:annealing}: $\mu$-annealing
+    & Proved
+    & Immediate from Prop.~\ref{prop:pareto-transfer}(b) \\
+Prop.~\ref{prop:complexity}: $O(NKm)$ complexity
+    & Proved
+    & Direct computation \\
+Conj.~\ref{conj:consistency}: Consistency ($K>1$)
+    & \textbf{Conjecture}
+    & Extends~\cite{astudillo2019composite}; requires set-valued convergence \\
+Conj.~\ref{conj:consistency} ($K=1$ case)
+    & Proved (by~\cite{astudillo2019composite})
+    & Composite BO consistency \\
+\bottomrule
+\end{tabular}
+\end{table}

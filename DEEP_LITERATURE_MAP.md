@@ -220,3 +220,6 @@ This is the clearest positioning. The bottom-right cell is empty. We fill it.
 - [ ] Look for any concurrent work (2025-2026) on many-objective BO
 - [ ] Verify qNParEGO source code — does it use augmented Chebyshev or plain?
 - [ ] Check if ScopeBO exists as a real method or if it's a misremembering
+- [x] PFES-VLB does NOT exist at ICML 2025 (hallucination, removed)
+- [x] MOBO-OSD (NeurIPS 2025) found — batch MOBO via orthogonal search directions, tests m=2-6 only. Must cite but not a threat to m>6 claims.
+- [x] No concurrent work found on STCH-Set in BO (searched Feb 18, 2026)

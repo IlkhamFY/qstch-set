@@ -1,0 +1,39 @@
+{
+  "id": "exp-001-dtlz2-m5",
+  "timestamp": "2026-02-18T16:46:29.395214",
+  "hypothesis": "STCH-Set with q=K=m should outperform qNParEGO at m=5 due to coordinated set optimization",
+  "config": {
+    "problem": "DTLZ2",
+    "m": 5,
+    "d": 6,
+    "K": 5,
+    "mu": 0.1,
+    "n_init": 20,
+    "n_iters": 30,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "decision_trace": [
+    "Chose K=m based on Lin ICLR25 Theorem 2 (K solutions for m objectives)",
+    "mu=0.1 from Lin default, ablation planned",
+    "Fixed q=K bug from v1 where q=1 made set method degenerate",
+    "5 seeds for NeurIPS statistical significance standard"
+  ],
+  "result": {
+    "stch_set_hv": "6.646 +/- 0.066",
+    "stch_nparego_hv": "6.117 +/- 0.163",
+    "qnparego_hv": "pending",
+    "random_hv": "pending"
+  },
+  "conclusion": "STCH-Set wins at m=5 by 8.6% over single-point STCH. Set advantage confirmed.",
+  "next_action": "Complete m=8,10 runs to find scaling behavior",
+  "lessons": [
+    "q=1 for set method is meaningless",
+    "Always verify q=K for STCH-Set"
+  ]
+}

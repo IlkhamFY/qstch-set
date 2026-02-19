@@ -1,0 +1,1 @@
+{"id": "exp-001-dtlz2-m5", "timestamp": "2026-02-18T16:46:29.395214", "hypothesis": "STCH-Set with q=K=m should outperform qNParEGO at m=5 due to coordinated set optimization", "conclusion": "STCH-Set wins at m=5 by 8.6% over single-point STCH. Set advantage confirmed."}

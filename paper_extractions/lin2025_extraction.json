@@ -1,0 +1,176 @@
+{
+  "metadata": {
+    "extraction_date": "2026-02-18",
+    "papers_analyzed": [
+      "Lin et al. 2025 - Few for Many: Tchebycheff Set Scalarization for Many-Objective Optimization (ICLR 2025)",
+      "Astudillo & Frazier 2019 - Bayesian Optimization of Composite Functions (ICML 2019)"
+    ]
+  },
+
+  "lin2025": {
+    "theorems": {
+      "theorem_1": {
+        "name": "Existence of Pareto Optimal Solution for Tchebycheff Set Scalarization",
+        "statement": "There exists an optimal solution set X̄*_K for the Tchebycheff set scalarization optimization problem (8) such that all solutions in X̄*_K are Pareto optimal of the original multi-objective optimization problem (1). In addition, if the optimal set X*_K is unique, all solutions in X*_K are Pareto optimal.",
+        "proof_method": "Construction and contradiction based on Definition 2 for (weakly) Pareto optimality and the form of TCH-Set Scalarization (8). Detailed proof in Appendix A.1.",
+        "caveat": "WITHOUT the unique optimal solution set assumption, only a WEAK existence guarantee. It is possible that many solutions in an optimal set are not even weakly Pareto optimal. Discussed in Appendix A.5."
+      },
+      "theorem_2": {
+        "name": "Pareto Optimality for Smooth Tchebycheff Set Scalarization",
+        "statement": "All solutions in the optimal solution set X*_K for the smooth Tchebycheff set scalarization problem (12) are weakly Pareto optimal of the original multi-objective optimization problem (1). In addition, the solutions are Pareto optimal if either: (1) the optimal solution set X*_K is unique, or (2) all preference coefficients are positive (λ_i > 0 for all i).",
+        "proof_method": "Contradiction based on Definition 2 for (weakly) Pareto optimality and the form of STCH-Set scalarization (12). Detailed proof in Appendix A.2.",
+        "key_insight": "Stronger than Theorem 1 — guarantees ALL solutions are weakly Pareto optimal (not just existence). With positive preferences (condition 2), full Pareto optimality is guaranteed without needing uniqueness."
+      },
+      "theorem_3": {
+        "name": "Uniform Smooth Approximation",
+        "statement": "The smooth Tchebycheff set (STCH-Set) scalarization g^{STCH-Set}_{μ,{μ_i}} is a uniform smooth approximation of the Tchebycheff set (TCH-Set) scalarization g^{TCH-Set}, and: lim_{μ↓0, μ_i↓0 ∀i} g^{STCH-Set}_{μ,{μ_i}}(X_K|λ) = g^{TCH-Set}(X_K|λ) for any valid set X_k ⊂ X.",
+        "proof_method": "Deriving upper and lower bounds of TCH-Set w.r.t. smooth smax and smin operators. Detailed proof in Appendix A.3."
+      },
+      "theorem_4": {
+        "name": "Convergence to Pareto Stationary Solution",
+        "statement": "If there exists a solution set X̂_K such that ∇_{x̂^(k)} g^{STCH-Set}_{μ,{μ_i}}(X̂_K|λ) = 0 for all x̂^(k) ∈ X̂_K, then all solutions in X̂_K are Pareto stationary solutions of the original multi-objective optimization problem (1).",
+        "proof_method": "Analyzing the gradient form of STCH-Set scalarization for each solution with the Pareto stationarity condition (Definition 4). Detailed proof in Appendix A.4."
+      }
+    },
+
+    "stch_set_formula": {
+      "equation_number": "Eq. 12",
+      "full_formula": "g^{STCH-Set}_{μ,{μ_i}}(X_K|λ) = μ·log(Σ_{i=1}^{m} exp( λ_i · (-μ_i · log(Σ_{k=1}^{K} exp(-f_i(x^(k))/μ_i)) - z*_i) / μ ))",
+      "simplified_formula_eq13": "g^{STCH-Set}_μ(X_K|λ) = μ·log(Σ_{i=1}^{m} exp( λ_i · (-log(Σ_{k=1}^{K} exp(-f_i(x^(k))/μ)) - z*_i) ))  [when μ_1=...=μ_m=μ]",
+      "structure": "Nested: outer smax over objectives i=1..m, inner smin over solutions k=1..K",
+      "components": {
+        "smax": "μ·log(Σ exp(·/μ))  — smooth approximation to max",
+        "smin": "-μ_i·log(Σ exp(-·/μ_i))  — smooth approximation to min",
+        "preference": "λ = (λ_1,...,λ_m) on simplex, uniform (1/m,...,1/m) used in all experiments",
+        "ideal_point": "z* = (z*_1,...,z*_m)"
+      },
+      "reduces_to": "Single-solution smooth Tchebycheff scalarization (Eq. 5) when K=1"
+    },
+
+    "approximation_bound": {
+      "explicit_finite_bound": "NOT provided in the paper",
+      "what_is_proven": "Theorem 3 proves ASYMPTOTIC convergence: lim_{μ↓0, μ_i↓0} g^{STCH-Set} = g^{TCH-Set} uniformly over all valid X_K",
+      "known_bounds_from_smooth_optimization": "From Beck & Teboulle 2012 / Nesterov 2005, the standard log-sum-exp bounds are: max(a_1,...,a_n) ≤ μ·log(Σ exp(a_i/μ)) ≤ max(a_1,...,a_n) + μ·log(n). So the smax over m objectives adds at most μ·log(m), and the smin over K solutions adds at most μ_i·log(K). Combined: g^{TCH-Set} - max_i(λ_i·μ_i·log(K)) ≤ g^{STCH-Set} ≤ g^{TCH-Set} + μ·log(m) + max_i(λ_i·μ_i·log(K))",
+      "note": "The paper references Nesterov 2005 and Beck & Teboulle 2012 for the smooth optimization framework but does not explicitly state a finite-μ error bound like O(μ·log(m) + μ·log(K)). The bound follows from standard smooth optimization theory."
+    },
+
+    "bayesian_optimization_mentions": {
+      "mentioned_anywhere": false,
+      "searched_terms": ["Bayesian optimization", "BO", "Gaussian process", "GP", "expensive evaluation", "sample efficiency", "surrogate model", "acquisition function"],
+      "details": "NOWHERE in the paper (including abstract, introduction, related work, experiments, conclusion, or appendix references) do they mention Bayesian optimization, Gaussian processes, surrogate models, or expensive/black-box evaluations in the BO sense. They mention 'black-box' only in the context of evolutionary algorithms for many-objective optimization. The paper focuses entirely on gradient-based optimization where objectives are differentiable and directly evaluable.",
+      "implications_for_our_work": "STCH-Set was NOT designed for or tested in a BO setting. Our adaptation to BO is novel — we would be the first to use STCH-Set as an acquisition function scalarization within a GP-based framework."
+    },
+
+    "experimental_objective_counts": {
+      "convex_optimization": {
+        "m_values": [128, 1024],
+        "K_values": [3, 4, 5, 6, 8, 10, 15, 20],
+        "description": "Random convex quadratic functions, 50 independent runs each"
+      },
+      "mixed_linear_regression": {
+        "m_value": 1000,
+        "K_values": [5, 10, 15, 20],
+        "noise_levels": [0.1, 0.5, 1.0],
+        "description": "1000 data points from K ground truth linear models"
+      },
+      "mixed_nonlinear_regression": {
+        "m_value": 1000,
+        "K_values": [5, 10, 15, 20],
+        "noise_levels": [0.1, 0.5, 1.0],
+        "description": "Nonlinear neural network models"
+      },
+      "summary": "Tested with m=128, m=1000, m=1024 objectives. K (solutions) ranged from 3 to 20. All experiments are in the K << m regime."
+    },
+
+    "baselines": [
+      {"name": "LS", "full_name": "Linear Scalarization", "description": "With randomly sampled preferences"},
+      {"name": "TCH", "full_name": "Tchebycheff Scalarization", "description": "With randomly sampled preferences"},
+      {"name": "STCH", "full_name": "Smooth Tchebycheff Scalarization", "description": "With randomly sampled preferences (lin2024smooth)"},
+      {"name": "MosT", "full_name": "Many-objective multi-solution Transport", "description": "Li et al. 2024, bi-level optimization with MGDA. Cannot handle 1024 objectives in reasonable time."},
+      {"name": "SoM", "full_name": "Sum-of-Minimum optimization", "description": "Ding et al. 2024, generalizes k-means++ and Lloyd's algorithm"},
+      {"name": "TCH-Set", "full_name": "Tchebycheff Set Scalarization (non-smooth)", "description": "Their own non-smooth variant, significantly worse than STCH-Set"}
+    ],
+
+    "limitations": {
+      "stated_limitations": [
+        "Only focuses on the DETERMINISTIC optimization setting where all objectives are always available",
+        "Does not handle partially observable objective values",
+        "General optimization method not tied to particular applications",
+        "When objectives are highly non-convex, hard to find global optimal set (only Pareto stationarity guarantee)"
+      ],
+      "unstated_but_important": [
+        "No BO/expensive evaluation setting — assumes cheap, differentiable objectives",
+        "Requires gradient access to all objectives",
+        "No stochastic/noisy objective evaluation framework",
+        "Smooth parameter μ selection is heuristic (uses 0.1 in experiments)",
+        "TCH-Set (non-smooth) has only WEAK Pareto guarantee (existence, not all solutions)",
+        "Number of solutions K must be chosen a priori"
+      ],
+      "future_work_mentioned": "Investigating partially observable objective values"
+    }
+  },
+
+  "astudillo_frazier_2019": {
+    "paper_info": {
+      "title": "Bayesian Optimization of Composite Functions",
+      "venue": "ICML 2019, PMLR 97:354-363",
+      "arxiv": "1906.01537",
+      "note": "HTML not available on arXiv; analysis based on abstract, search results, and ICML proceedings"
+    },
+
+    "composite_structure": {
+      "formulation": "f(x) = g(h(x)), where h is a black-box expensive-to-evaluate function with VECTOR-VALUED outputs, and g is a cheap-to-evaluate real-valued function",
+      "model": "h modeled using a multi-output Gaussian process",
+      "key_insight": "Exploits composite structure to improve sampling efficiency over standard BO"
+    },
+
+    "ei_cf_acquisition": {
+      "name": "Expected Improvement for Composite Functions (EI-CF)",
+      "formula": "EI-CF_n(x) = E_n[(g(h(x)) - f*_n)^+]",
+      "computation": "Cannot be computed in closed form for general nonlinear g. They provide a novel stochastic gradient estimator for efficient maximization.",
+      "posterior": "Non-Gaussian posterior on f since f = g(h) and g is nonlinear while h has GP posterior"
+    },
+
+    "consistency_theorem": {
+      "statement": "Under suitable conditions (on the GP kernel and sampling), the method recovers a globally optimal solution as sampling effort grows to infinity, with probability approaching 1.",
+      "section": "Section 4.4 of the paper",
+      "generalizes": "Previous convergence results for classical expected improvement (Vazquez & Bect 2010)",
+      "conditions": "Suitable GP kernel conditions and sampling conditions (standard for BO consistency proofs)"
+    },
+
+    "relevance_to_our_work": {
+      "can_cite_for_convergence": true,
+      "reasoning": "Astudillo & Frazier prove that if you have f(x) = g(h(x)) where h is modeled by a multi-output GP and g is a known cheap function, then EI on the composite is asymptotically consistent. Our STCH-Set scalarization IS exactly such a g function — it's a known, cheap-to-evaluate scalarization applied to multi-output GP posteriors. So their framework provides theoretical grounding for our approach.",
+      "key_connection": "STCH-Set scalarization g^{STCH-Set}(X_K|λ) applied to GP posterior samples of h(x) = (f_1(x),...,f_m(x)) is exactly the composite BO framework with g = STCH-Set scalarization",
+      "caveats": [
+        "Their framework is for SINGLE input x, not a set X_K of K solutions. Our case optimizes over K candidates jointly.",
+        "They model h as a standard multi-output GP. We need multiple independent GPs or a multi-output GP for m objectives.",
+        "Their consistency proof may need adaptation for the set optimization case.",
+        "g must be continuous (STCH-Set is smooth, so this holds) and cheap to evaluate (STCH-Set is O(mK), so this holds)."
+      ]
+    },
+
+    "natural_extension_to_multi_output_set_scalarization": {
+      "directly_extends": "PARTIALLY",
+      "explanation": "Their framework naturally handles multi-output h and a known scalarization g. STCH-Set IS such a scalarization. However, their framework optimizes over a single x, not a set X_K. The set optimization aspect (jointly optimizing K solutions) is our novel contribution. The per-solution version (K=1, standard STCH) fits their framework directly.",
+      "what_we_contribute": "Extending composite BO from single-solution scalarization to SET scalarization, where the acquisition function is EI applied to g^{STCH-Set} over K candidate solutions simultaneously."
+    }
+  },
+
+  "synthesis_for_our_project": {
+    "key_findings": [
+      "STCH-Set was NEVER designed for or tested with BO — our adaptation is genuinely novel",
+      "Theorem 2 gives us Pareto optimality guarantees with positive preferences (which we always use)",
+      "The approximation bound is μ·log(m) + O(μ·log(K)) from standard smooth optimization theory, not explicitly stated in paper",
+      "Astudillo & Frazier's composite BO framework provides the convergence backbone we need",
+      "The K=1 case of our method maps directly to composite BO; the K>1 case is our novel extension",
+      "Their 'partially observable objectives' is listed as future work — aligns with BO where we observe one point at a time"
+    ],
+    "risks": [
+      "No prior work combines STCH-Set with BO — we have no direct precedent to compare against",
+      "Consistency proof adaptation from single-x to set-X_K is non-trivial",
+      "Smooth parameter μ interaction with GP posterior uncertainty is unexplored",
+      "Computational cost: STCH-Set evaluation is O(mK) per candidate, but MC integration over GP posterior adds overhead"
+    ]
+  }
+}

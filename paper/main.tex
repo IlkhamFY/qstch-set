@@ -19,7 +19,18 @@
 \usepackage{graphicx}
 \usepackage{multirow}
 \usepackage{subcaption}
+\usepackage{amsthm}
 \usepackage{thm-restate}
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{conjecture}[theorem]{Conjecture}
 
 % Custom commands
 \newcommand{\placeholder}[1]{{\color{red}\textbf{[#1]}}}
