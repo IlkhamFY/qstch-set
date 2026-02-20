@@ -83,9 +83,12 @@ qSTCH-Set fills a fundamental gap in many-objective Bayesian optimization, enabl
 %=============================================================================
 
 Many real-world optimization problems require balancing a large number of conflicting objectives simultaneously.
-In drug discovery, a candidate molecule must satisfy constraints on potency, selectivity, metabolic stability, permeability, and toxicity---routinely $m{=}20$--$50$ ADMET endpoints.
-In materials design, one seeks alloys balancing strength, weight, cost, and corrosion resistance.
-When function evaluations are expensive---requiring physical experiments, molecular simulations, or costly assays---multi-objective Bayesian optimization (MOBO) provides a principled, sample-efficient framework that fits Gaussian process (GP) surrogates to observed data and uses acquisition functions to guide evaluation~\citep{balandat2020botorch}.
+Consider lead optimization in drug discovery: a single candidate must simultaneously minimize hERG channel inhibition (cardiotoxicity), CYP3A4 liability (drug--drug interactions), and Ames mutagenicity, while maximizing Caco-2 permeability (oral absorption), microsomal stability (half-life), and maintaining TPSA and logP within tight windows---routinely $m{=}20$--$50$ ADMET endpoints evaluated in parallel.
+In a design--make--test--analyze (DMTA) loop, each synthesis costs \$500--2{,}000 and takes days; the acquisition function serves as the oracle that decides \emph{which} molecule to synthesize next from a continuous latent space, so a single wasted batch evaluation has real dollar cost.
+Unlike discrete or generative molecular optimization, where the search space can be pruned between rounds, continuous Bayesian optimization commits to a fixed input domain---making batch-level coordination essential: qSTCH-Set ensures that the $K$ candidates in each round cover orthogonal ADMET trade-off directions rather than redundantly exploring the same region.
+In materials design, analogous trade-offs arise among strength, weight, cost, and corrosion resistance.
+When function evaluations are this expensive, multi-objective Bayesian optimization (MOBO) provides a principled, sample-efficient framework that fits Gaussian process (GP) surrogates to observed data and uses acquisition functions to guide evaluation~\citep{balandat2020botorch}.
+More broadly, qSTCH-Set is a natural acquisition oracle for generative molecular design: paired with a GFlowNet~\citep{bengio2021gflownet} or VAE decoder, it can steer a generative model to propose diverse, Pareto-optimal candidate sets rather than single-objective leads.
 
 However, existing MOBO methods face a fundamental scaling barrier in the number of objectives~$m$.
 Hypervolume-based acquisition functions---the gold standard for $m \le 4$---rely on non-dominated partitioning of the objective space, which is \#P-hard in~$m$~\citep{daulton2020qnehvi,daulton2021qnehvi,wang2024pohvi}.
@@ -254,14 +257,14 @@ Figure~\ref{fig:convergence_m5} shows the convergence curves at $m{=}5$, and Fig
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/convergence_m5.pdf}
-\caption{Convergence on DTLZ2 with $m{=}5$ objectives, $K{=}5$. qSTCH-Set (blue) converges faster and reaches higher final HV than all baselines, with notably tighter variance than qNParEGO (5 seeds). Error bands show $\pm 1$ standard deviation.}
+\caption{Convergence on DTLZ2 with $m{=}5$ objectives, $K{=}5$ (5 seeds). At this modest objective count, qNParEGO ($6.44 \pm 0.16$) slightly outperforms qSTCH-Set ($6.22 \pm 0.50$), reflecting that random scalarization weights still cover the Pareto front adequately when $m$ is small. qSTCH-Set's advantage emerges at higher~$m$. Error bands show $\pm 1$ standard deviation.}
 \label{fig:convergence_m5}
 \end{figure}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/convergence_m8.pdf}
-\caption{Convergence on DTLZ2 with $m{=}8$ objectives, $K{=}8$ (5 seeds). qSTCH-Set approaches qNParEGO, with the advantage of set-based coordination growing over iterations. Error bands show $\pm 1$ standard deviation.}
+\caption{Convergence on DTLZ2 with $m{=}8$ objectives, $K{=}8$ (5 seeds). qSTCH-Set ($20.22 \pm 1.90$) is competitive with qNParEGO ($20.89 \pm 0.83$), closing the gap that exists with $K{=}5$ (from $19.26$ to $20.22$, a 5\% improvement). Error bands show $\pm 1$ standard deviation.}
 \label{fig:convergence_m8}
 \end{figure}
 
@@ -323,6 +326,20 @@ We choose $K{=}m$ for practical experiments to balance coverage and cost. The cr
 \subsection{Computational Cost}
 
 Detailed wall-clock timings on H100 MIG partitions are in Appendix~\ref{app:extended-results}. The key finding is that per-iteration cost scales as $O(Nm^2)$: at $m{=}5$ ($K{=}5$), qSTCH-Set averages $\sim 23$s/iter (comparable to qNParEGO at $\sim 25$s/iter), while at $m{=}8$ ($K{=}8$) it rises to $\sim 336$s/iter due to the larger joint optimization space ($Kd = 96$ variables). However, for the target application---expensive black-box functions where each evaluation costs minutes to hours---the acquisition overhead is negligible, and the $K$-fold parallelism of batch evaluation offsets the per-iteration cost.
+
+\subsection{Generalization: DTLZ7 and WFG4}
+\label{sec:dtlz7-wfg4}
+
+The DTLZ2 benchmark has a convex, connected Pareto front (the positive orthant of a unit hypersphere), which is inherently favorable for scalarization methods.
+To test qSTCH-Set's robustness to challenging Pareto front geometries, we evaluate on two additional benchmarks: \textbf{DTLZ7}~\citep{dtlz2005}, whose Pareto front consists of $2^{m-1}$ disconnected regions (testing whether set-based coordination can maintain multi-modal coverage across disjoint Pareto segments), and \textbf{WFG4}~\citep{wfg2006}, which has a concave, non-separable front (testing robustness to non-convex geometry where not all Pareto-optimal points are recoverable by linear scalarization).
+
+\paragraph{Setup.} We follow the same protocol as DTLZ2: $m \in \{5, 8\}$ objectives, $K{=}m$, 10 independent seeds, 20 BO iterations, $N{=}256$ MC samples, $\mu{=}0.1$, Mat\'ern-5/2 kernel with MLE hyperparameters.
+
+\placeholder{TABLE: DTLZ7 and WFG4 results --- fill when Nibi results land. Columns: Method, DTLZ7 $m{=}5$, DTLZ7 $m{=}8$, WFG4 $m{=}5$, WFG4 $m{=}8$. Rows: qSTCH-Set ($K{=}m$), qNParEGO, STCH-NParEGO, Random.}
+
+On DTLZ7, \placeholder{NARRATIVE: e.g., ``qSTCH-Set maintains coverage across all disconnected Pareto segments, achieving HV X.XX vs Y.YY for qNParEGO, a Z\% improvement'' OR ``qNParEGO outperforms due to...''}. On WFG4, \placeholder{NARRATIVE: e.g., ``the concave geometry reduces the advantage of scalarization-based methods, but qSTCH-Set remains competitive at HV X.XX vs Y.YY''}. These results \placeholder{confirm/qualify} the generality of the $K{=}m$ design rule beyond convex Pareto fronts.
+
+\emph{Note: DTLZ7 and WFG4 experiments are running on the Nibi cluster; \texttt{\textbackslash placeholder\{\}} tags will be filled with final numbers before submission.}
 
 \subsection{Validation on Bi-Objective Problems}
 

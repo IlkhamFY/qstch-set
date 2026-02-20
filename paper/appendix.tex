@@ -297,7 +297,7 @@ This comparison is critical for disentangling two sources of qSTCH-Set's advanta
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.7\linewidth]{figures/convergence_m10.pdf}
-\caption{Convergence on DTLZ2 with $m{=}10$ objectives, $K{=}10$ (3 seeds). qSTCH-Set outperforms qNParEGO by 6.5\% ($46.95 \pm 1.31$ vs $44.10 \pm 0.99$), with the gap emerging after $\sim$5 iterations.}
+\caption{Convergence on DTLZ2 with $m{=}10$ objectives, $K{=}10$ (3 seeds). qSTCH-Set outperforms qNParEGO by 6.5\% ($46.95 \pm 1.31$ vs $44.10 \pm 0.99$), with the gap widening after $\sim$5 iterations. This is the regime where set-based coordination is decisive.}
 \label{fig:convergence_m10}
 \end{figure}
 
@@ -412,6 +412,32 @@ $m$ & $K=m$ & Observed/Projected time/iter & Total acq.\ overhead (20 iters) \\
 \end{table}
 
 For $m = 50$, the projected $\sim$5.6 days of acquisition overhead per 20-iteration run is impractical on a single GPU. Two practical mitigations exist: (a)~distributing the $N$ MC samples across multiple GPUs reduces wall time proportionally (near-linear speedup since samples are independent), or (b)~fixing $K$ at a manageable size (e.g., $K = 10 \ll m = 50$) and accepting partial Pareto front coverage as a practical fallback. The latter trades coordination quality for computational feasibility, and our ablation suggests that even $K < m$ provides meaningful improvements over single-point methods.
+
+\subsection{Complexity Comparison Across Methods}
+
+Table~\ref{tab:complexity-comparison} provides a theoretical comparison of per-evaluation computational complexity, batch coordination capabilities, and scalability to many objectives ($m > 5$) across leading MOBO acquisition functions.
+
+\begin{table}[h]
+\caption{Computational complexity comparison of multi-objective acquisition functions. $N$: MC samples, $m$: objectives, $K$: batch size, $|P|$: Pareto front size. qSTCH-Set is the only method that achieves both batch coordination and polynomial scaling in~$m$.}
+\label{tab:complexity-comparison}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Method & Per-eval complexity & Batch coordination & Scales to $m{>}5$? \\
+\midrule
+qEHVI~\citep{daulton2020qnehvi} & $O(N \cdot 2^m)$ & Yes (HV partitioning) & No \\
+qNParEGO~\citep{daulton2020qnehvi} & $O(N \cdot m)$ & No (random $\boldsymbol{\lambda}$) & Yes \\
+MESMO/PFES~\citep{belakaria2019mesmo,suzuki2020pfes} & $O(N \cdot m \cdot |P|)$ & No & Partial$^\dagger$ \\
+\midrule
+\textbf{qSTCH-Set (ours)} & $O(N \cdot K \cdot m)$ & Yes (set-based) & Yes \\
+\quad with $K{=}m$ & $O(N \cdot m^2)$ & Yes (set-based) & Yes \\
+\bottomrule
+\end{tabular}
+\vspace{2pt}
+{\footnotesize $^\dagger$MESMO/PFES: $|P|$ grows combinatorially with $m$, making Pareto front sampling increasingly expensive for $m \gg 5$. In practice, approximations are required.\\
+\textbf{Key insight:} qEHVI provides batch coordination but at exponential cost; qNParEGO scales linearly but lacks coordination. qSTCH-Set achieves both coordination \emph{and} polynomial scaling, at the cost of quadratic dependence on $m$ (when $K{=}m$). For $m \le 50$, $O(Nm^2)$ is practical; for $m = 1{,}000$+, sublinear $K$ or stochastic mini-batch strategies would be needed.}
+\end{table}
 
 
 %=============================================================================
