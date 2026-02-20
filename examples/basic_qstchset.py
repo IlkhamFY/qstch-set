@@ -1,60 +1,52 @@
-"""Minimal example: qSTCHSet acquisition function with BoTorch.
-
-Demonstrates how to use qSTCHSet for multi-objective Bayesian optimization
-on a simple 2-objective problem.
 """
+Minimal example: Many-objective BO with qSTCH-Set.
 
+Optimizes a simple 5-objective problem in 2 minutes on CPU.
+Run: python examples/basic_qstchset.py
+"""
 import torch
-from botorch.fit import fit_gpytorch_mll
-from botorch.models import SingleTaskGP
-from botorch.models.transforms.outcome import Standardize
-from botorch.optim import optimize_acqf
-from gpytorch.mlls import ExactMarginalLogLikelihood
+from stch_botorch import run_mobo
 
-from stch_botorch.acquisition import qSTCHSet
-
-
-def main() -> None:
-    # --- Problem setup ---
-    d = 3  # input dimensions
-    m = 2  # objectives
-    n_init = 10  # initial points
-
-    bounds = torch.stack([torch.zeros(d), torch.ones(d)])
-
-    # Simple bi-objective: minimize f1 = sum(x), f2 = sum((x-1)^2)
-    # BoTorch maximizes, so we negate.
-    def objective(X: torch.Tensor) -> torch.Tensor:
-        f1 = -X.sum(dim=-1)
-        f2 = -((X - 1) ** 2).sum(dim=-1)
-        return torch.stack([f1, f2], dim=-1)
-
-    # --- Initial data ---
-    train_X = torch.rand(n_init, d)
-    train_Y = objective(train_X)
-
-    # --- Fit GP ---
-    model = SingleTaskGP(train_X, train_Y, outcome_transform=Standardize(m=m))
-    mll = ExactMarginalLogLikelihood(model.likelihood, model)
-    fit_gpytorch_mll(mll)
-
-    # --- Build qSTCHSet acquisition ---
-    ref_point = train_Y.min(dim=0).values - 0.1
-    acqf = qSTCHSet(model=model, ref_point=ref_point, mu=0.1)
-
-    # --- Optimize: jointly select q=4 candidates ---
-    candidates, value = optimize_acqf(
-        acq_function=acqf,
-        bounds=bounds,
-        q=4,
-        num_restarts=10,
-        raw_samples=256,
-    )
-
-    print(f"Selected candidates:\n{candidates}")
-    print(f"Acquisition value: {value.item():.4f}")
-    print(f"Objective values:\n{objective(candidates)}")
-
+def simple_5obj(X):
+    """
+    5 conflicting objectives for 6D input.
+    Each objective i wants x[i] to be 1, while x[j] (j!=i) contributes penalty.
+    """
+    # X shape: (n, 6)
+    # Objectives: f_i(x) = - (x[i] - 1)^2 - 0.1 * sum_{j!=i} x[j]^2
+    # We want to maximize these (minimize distance to 1)
+    
+    n, d = X.shape
+    m = 5
+    objs = []
+    
+    for i in range(m):
+        # Term 1: (x[i] - 1)^2
+        t1 = (X[:, i] - 1) ** 2
+        # Term 2: sum of squares of other vars
+        # Create mask for j!=i
+        mask = torch.ones(d, dtype=torch.bool, device=X.device)
+        mask[i] = False
+        t2 = (X[:, mask] ** 2).sum(dim=1)
+        
+        # Maximize: negate the loss
+        obj = -(t1 + 0.1 * t2)
+        objs.append(obj)
+        
+    return torch.stack(objs, dim=-1) # (n, 5)
 
 if __name__ == "__main__":
-    main()
+    bounds = torch.stack([torch.zeros(6), torch.ones(6)])
+    print("Running 5-objective optimization...")
+    
+    results = run_mobo(
+        f=simple_5obj, 
+        bounds=bounds, 
+        n_obj=5, 
+        budget=60, 
+        seed=42, 
+        verbose=True
+    )
+    
+    print(f"\nFinal HV: {results.hypervolume_history[-1]:.4f}")
+    print(f"Pareto front size: {results.pareto_Y.shape[0]}")

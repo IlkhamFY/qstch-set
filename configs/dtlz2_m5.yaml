@@ -1,0 +1,17 @@
+problem:
+  name: DTLZ2
+  n_obj: 5
+  dim: 14  # n_obj + 9 (k=10)
+method:
+  name: qSTCHSet
+  batch_size: 5  # K = n_obj
+  mu: 0.1
+  n_samples: 256
+  n_restarts: 20
+bo:
+  n_init: 20
+  n_iter: 20  # Total evals: 20 + 20*5 = 120
+  n_seeds: 5
+output:
+  dir: results/dtlz2_m5
+  save_freq: 5

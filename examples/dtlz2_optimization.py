@@ -1,83 +1,67 @@
-"""Full MOBO loop: qSTCHSet on DTLZ2 (3 objectives).
-
-Runs a complete multi-objective Bayesian optimization loop using qSTCHSet
-on the DTLZ2 test problem and reports hypervolume at each iteration.
 """
+Benchmark example: Optimize DTLZ2 (5 objectives) using qSTCH-Set.
 
+Run: python examples/dtlz2_optimization.py
+"""
+import matplotlib.pyplot as plt
 import torch
-from botorch.fit import fit_gpytorch_mll
-from botorch.models import SingleTaskGP
-from botorch.models.transforms.outcome import Standardize
-from botorch.optim import optimize_acqf
 from botorch.test_functions.multi_objective import DTLZ2
-from botorch.utils.multi_objective.hypervolume import Hypervolume
-from botorch.utils.multi_objective.pareto import is_non_dominated
-from gpytorch.mlls import ExactMarginalLogLikelihood
+from stch_botorch import run_mobo
 
-from stch_botorch.acquisition import qSTCHSet
-
-
-def main() -> None:
-    # --- Configuration ---
-    d = 4          # input dimensions (d >= m for DTLZ2)
-    m = 3          # objectives
-    n_init = 2 * d # initial points
-    n_iters = 15   # BO iterations
-    q = 2          # batch size per iteration
-
-    torch.manual_seed(42)
-
-    # --- Problem ---
-    problem = DTLZ2(dim=d, num_objectives=m, negate=True)  # negate → maximization
-    bounds = torch.stack([torch.zeros(d), torch.ones(d)])
-    ref_point = torch.full((m,), -1.5)  # dominated reference for hypervolume
-
-    hv_computer = Hypervolume(ref_point=ref_point)
-
-    # --- Initial data ---
-    train_X = torch.rand(n_init, d)
-    train_Y = problem(train_X)
-
-    print(f"DTLZ2 (d={d}, m={m}), q={q}, {n_iters} iterations")
-    print("-" * 50)
-
-    for i in range(n_iters):
-        # Fit GP
-        model = SingleTaskGP(train_X, train_Y, outcome_transform=Standardize(m=m))
-        mll = ExactMarginalLogLikelihood(model.likelihood, model)
-        fit_gpytorch_mll(mll)
-
-        # Build acquisition
-        acqf = qSTCHSet(
-            model=model,
-            ref_point=ref_point,
-            mu=0.1,
-        )
-
-        # Optimize
-        candidates, _ = optimize_acqf(
-            acq_function=acqf,
-            bounds=bounds,
-            q=q,
-            num_restarts=10,
-            raw_samples=256,
-        )
-
-        # Evaluate and append
-        new_Y = problem(candidates)
-        train_X = torch.cat([train_X, candidates], dim=0)
-        train_Y = torch.cat([train_Y, new_Y], dim=0)
-
-        # Compute hypervolume of current Pareto front
-        pareto_mask = is_non_dominated(train_Y)
-        pareto_Y = train_Y[pareto_mask]
-        hv = hv_computer.compute(pareto_Y)
-
-        print(f"Iter {i+1:3d} | n={train_X.shape[0]:4d} | Pareto={pareto_mask.sum().item():3d} | HV={hv:.4f}")
-
-    print("-" * 50)
-    print(f"Final hypervolume: {hv:.4f}")
-
+def main():
+    print("Running DTLZ2 (m=5) optimization...")
+    
+    # 1. Setup Problem
+    n_obj = 5
+    dim = 14  # standard dim for DTLZ2(m=5) is usually m + k - 1
+    # BoTorch defaults? DTLZ2(dim=..., num_objectives=...)
+    # Standard: k=10. dim = m + k - 1 = 5 + 10 - 1 = 14.
+    
+    problem = DTLZ2(dim=dim, num_objectives=n_obj, negate=True) # negate=True for maximization
+    
+    # Bounds: [0, 1]^d
+    bounds = torch.stack([torch.zeros(dim), torch.ones(dim)])
+    
+    # 2. Run Optimization
+    # Budget 100, Batch 5
+    results = run_mobo(
+        f=problem, 
+        bounds=bounds, 
+        n_obj=n_obj, 
+        budget=100, 
+        batch_size=5, 
+        seed=123, 
+        verbose=True
+    )
+    
+    # 3. Analyze Results
+    print("\nOptimization Complete!")
+    print(f"Final Hypervolume: {results.hypervolume_history[-1]:.4f}")
+    print(f"Pareto Front Size: {len(results.pareto_Y)}")
+    
+    # Reference value for DTLZ2(m=5)?
+    # Max HV is roughly volume of unit sphere sector?
+    # Actually depends heavily on reference point used for HV calculation.
+    # We used adaptive ref point in run_mobo, so absolute value might vary.
+    
+    # 4. Plot Convergence
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(len(results.hypervolume_history)), results.hypervolume_history, marker='o')
+    plt.title(f"DTLZ2 (m={n_obj}) Convergence")
+    plt.xlabel("Iteration")
+    plt.ylabel("Hypervolume (adaptive ref point)")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("examples/dtlz2_convergence.png")
+    print("Convergence plot saved to examples/dtlz2_convergence.png")
+    
+    # 5. Print Comparison Table
+    print("\n--- Final Stats ---")
+    print(f"{'Metric':<20} | {'Value':<10}")
+    print("-" * 35)
+    print(f"{'Hypervolume':<20} | {results.hypervolume_history[-1]:.4f}")
+    print(f"{'Pareto Points':<20} | {len(results.pareto_Y)}")
+    print(f"{'Total Evals':<20} | {results.n_evals}")
 
 if __name__ == "__main__":
     main()
