@@ -146,3 +146,67 @@
 **On session restart:**
 - `memory_search("stch-botorch papers")` will surface this file
 - Read it before any discussion of related work or positioning
+
+---
+
+## [Informing Acquisition Functions via Foundation Models for Molecular Discovery](https://arxiv.org/abs/2512.13935)
+**Added:** 2026-02-21
+**Authors:** Qi Chen, Fabio Ramos, Alan Aspuru-Guzik, Florian Shkurti
+**Venue:** arXiv preprint (2025)
+**Citations:** 0 (new)
+**Threat Level:** 2 — LLM priors + MCTS for single-objective molecular BO; no multi-objective component
+
+### Method
+Likelihood-free BO that bypasses GP surrogate modeling entirely. Uses LLM/chemistry foundation model priors directly to inform acquisition functions. Learns a tree-structured partition of molecular space (MCTS) with local acquisition functions. LLM-based coarse clustering restricts candidate evaluation to high-value regions.
+
+### Gap They Claim
+Standard BO fails in low-data, large candidate-space molecular discovery. GP surrogates lack chemistry priors; Bayesian deep learning is expensive.
+
+### Key Results
+Improved scalability, robustness, sample efficiency vs standard BO in LLM-guided molecular discovery. No multi-objective results.
+
+### Overlap With My Work
+Not a direct competitor -- no MOBO, no Pareto front, no scalarization. Complementary: their MCTS acquisition search could pair with qSTCH-Set for multi-objective molecular BO. Aspuru-Guzik group -- influential, worth monitoring for MOBO follow-up. Future work framing: qSTCH-Set + LLM priors for DMTA loops.
+
+### BibTeX
+```bibtex
+@article{Chen2025llmbo,
+  title   = {Informing Acquisition Functions via Foundation Models for Molecular Discovery},
+  author  = {Chen, Qi and Ramos, Fabio and Aspuru-Guzik, Al\'{a}n and Shkurti, Florian},
+  journal = {arXiv preprint arXiv:2512.13935},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2512.13935}
+}
+```
+
+---
+
+## [A Sober Look at LLMs for Material Discovery](https://arxiv.org/abs/2402.05015)
+**Added:** 2026-02-21
+**Authors:** Agustinus Kristiadi, Felix Strieth-Kalthoff, Marta Skreta, Pascal Poupart, Alan Aspuru-Guzik, Geoff Pleiss
+**Venue:** arXiv preprint (2024)
+**Citations:** 47
+**Threat Level:** 1 — Single-objective BO with LLM features; orthogonal to multi-objective scalarization
+
+### Method
+Treats LLMs as fixed feature extractors for standard GP surrogate models. Uses parameter-efficient finetuning + Bayesian neural networks to get proper posterior uncertainty. Rigorous Bayesian treatment -- no heuristics.
+
+### Gap They Claim
+Existing LLM-for-BO uses non-Bayesian, point-estimated LLMs with unreliable uncertainty. LLMs only useful for molecular BO if domain-pretrained or finetuned.
+
+### Key Results
+Domain-specific LLMs outperform general LLMs as BO surrogates. General LLMs (GPT-4 etc.) are NOT reliably useful for principled BO. 47 citations in ~1 year -- well-received reality check.
+
+### Overlap With My Work
+Completely orthogonal -- better GP surrogate vs our better acquisition strategy. Key insight for our motivation: domain-pretrained LLM features + qSTCH-Set acquisition = natural DMTA stack. We sidestep their "only useful with domain pretraining" concern entirely since qSTCH-Set doesn't rely on LLM priors at all. Cite when discussing surrogate models for molecular BO in intro.
+
+### BibTeX
+```bibtex
+@article{Kristiadi2024soberlook,
+  title   = {A Sober Look at {LLMs} for Material Discovery: Are They Actually Good for {Bayesian} Optimization Over Molecules?},
+  author  = {Kristiadi, Agustinus and Strieth-Kalthoff, Felix and Skreta, Marta and Poupart, Pascal and Aspuru-Guzik, Al\'{a}n and Pleiss, Geoff},
+  journal = {arXiv preprint arXiv:2402.05015},
+  year    = {2024},
+  url     = {https://arxiv.org/abs/2402.05015}
+}
+```
