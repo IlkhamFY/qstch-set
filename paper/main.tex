@@ -327,19 +327,10 @@ We choose $K{=}m$ for practical experiments to balance coverage and cost. The cr
 
 Detailed wall-clock timings on H100 MIG partitions are in Appendix~\ref{app:extended-results}. The key finding is that per-iteration cost scales as $O(Nm^2)$: at $m{=}5$ ($K{=}5$), qSTCH-Set averages $\sim 23$s/iter (comparable to qNParEGO at $\sim 25$s/iter), while at $m{=}8$ ($K{=}8$) it rises to $\sim 336$s/iter due to the larger joint optimization space ($Kd = 96$ variables). However, for the target application---expensive black-box functions where each evaluation costs minutes to hours---the acquisition overhead is negligible, and the $K$-fold parallelism of batch evaluation offsets the per-iteration cost.
 
-\subsection{Generalization: DTLZ7 and WFG4}
+\subsection{Benchmark Scope and Future Experiments}
 \label{sec:dtlz7-wfg4}
 
-The DTLZ2 benchmark has a convex, connected Pareto front (the positive orthant of a unit hypersphere), which is inherently favorable for scalarization methods.
-To test qSTCH-Set's robustness to challenging Pareto front geometries, we evaluate on two additional benchmarks: \textbf{DTLZ7}~\citep{dtlz2005}, whose Pareto front consists of $2^{m-1}$ disconnected regions (testing whether set-based coordination can maintain multi-modal coverage across disjoint Pareto segments), and \textbf{WFG4}~\citep{wfg2006}, which has a concave, non-separable front (testing robustness to non-convex geometry where not all Pareto-optimal points are recoverable by linear scalarization).
-
-\paragraph{Setup.} We follow the same protocol as DTLZ2: $m \in \{5, 8\}$ objectives, $K{=}m$, 10 independent seeds, 20 BO iterations, $N{=}256$ MC samples, $\mu{=}0.1$, Mat\'ern-5/2 kernel with MLE hyperparameters.
-
-\placeholder{TABLE: DTLZ7 and WFG4 results --- fill when Nibi results land. Columns: Method, DTLZ7 $m{=}5$, DTLZ7 $m{=}8$, WFG4 $m{=}5$, WFG4 $m{=}8$. Rows: qSTCH-Set ($K{=}m$), qNParEGO, STCH-NParEGO, Random.}
-
-On DTLZ7, \placeholder{NARRATIVE: e.g., ``qSTCH-Set maintains coverage across all disconnected Pareto segments, achieving HV X.XX vs Y.YY for qNParEGO, a Z\% improvement'' OR ``qNParEGO outperforms due to...''}. On WFG4, \placeholder{NARRATIVE: e.g., ``the concave geometry reduces the advantage of scalarization-based methods, but qSTCH-Set remains competitive at HV X.XX vs Y.YY''}. These results \placeholder{confirm/qualify} the generality of the $K{=}m$ design rule beyond convex Pareto fronts.
-
-\emph{Note: DTLZ7 and WFG4 experiments are running on the Nibi cluster; \texttt{\textbackslash placeholder\{\}} tags will be filled with final numbers before submission.}
+The experiments above use DTLZ2, which has a convex, connected Pareto front — inherently favorable for scalarization methods. Two important extensions remain as immediate future work: \textbf{DTLZ7}~\citep{dtlz2005}, whose $2^{m-1}$ disconnected Pareto segments test whether set-based coordination can maintain multi-modal coverage, and \textbf{WFG4}~\citep{wfg2006}, whose concave non-separable front tests robustness to geometries where linear scalarization misses concave regions. We note that DTLZ2's convex front represents the \emph{best} case for scalarization; results on disconnected or concave fronts will provide a more conservative bound on qSTCH-Set's practical advantage. These benchmarks are planned for the next revision.
 
 \subsection{Validation on Bi-Objective Problems}
 
