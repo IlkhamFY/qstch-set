@@ -1,0 +1,28 @@
+{
+  "id": "DTLZ2-final-2026-02-21",
+  "timestamp": "2026-02-21T10:01:19.682771",
+  "hypothesis": "STCH-Set outperforms STCH-NParEGO and qNParEGO on DTLZ2 across m=5,8,10",
+  "config": {},
+  "decision_trace": [],
+  "result": {
+    "m5": {
+      "STCH-Set": "6.692+-0.159",
+      "NParEGO": "6.117+-0.156",
+      "qNParEGO": "6.429+-0.254"
+    },
+    "m8": {
+      "STCH-Set": "22.998+-0.718",
+      "NParEGO": "20.620+-1.459",
+      "qNParEGO": "21.606+-0.826"
+    },
+    "m10": {
+      "STCH-Set": "51.936+-0.739",
+      "NParEGO": "44.191+-1.325",
+      "qNParEGO": "47.354+-0.861"
+    },
+    "runtime_hours": 25.33
+  },
+  "conclusion": "Hypothesis confirmed. STCH-Set wins all dims with lower variance at high m. Paper results ready.",
+  "next_action": "Run mu/K ablations, DTLZ7, WFG4. Need fresh Duo code for Nibi. Fill paper results section.",
+  "lessons": []
+}
