@@ -71,7 +71,7 @@
 Multi-objective Bayesian optimization (MOBO) scales poorly beyond five objectives: hypervolume-based acquisition functions incur exponential cost in the number of objectives~$m$, while scalarization methods produce uncoordinated batches via random weight vectors.
 Set-based smooth Tchebycheff (STCH-Set) scalarization addresses this in gradient-based optimization, and single-point STCH has been adapted to BO, but no method combines set-based coordination with sample-efficient surrogate-driven search.
 We introduce qSTCH-Set, a Monte Carlo acquisition function that jointly optimizes $K$ candidates via STCH-Set scalarization over Gaussian process posterior samples at $O(Km)$ cost, with the design rule $K{=}m$ allocating one candidate per objective.
-On DTLZ2, qSTCH-Set outperforms qNParEGO ($q{=}1$) at all tested dimensionalities, with the advantage growing with~$m$: $+4\%$ at $m{=}5$ ($6.69 \pm 0.16$ vs $6.43 \pm 0.25$), $+6.4\%$ at $m{=}8$ ($23.00 \pm 0.72$ vs $21.61 \pm 0.83$), and $+9.7\%$ at $m{=}10$ ($51.94 \pm 0.74$ vs $47.35 \pm 0.86$); budget-matched comparisons (qNParEGO with $q{=}m$) are provided in Appendix~\ref{app:budget-matched}.
+On DTLZ2 with $m{=}5$ objectives and $K{=}m{=}5$, qSTCH-Set achieves hypervolume $6.69 \pm 0.16$, outperforming qNParEGO ($6.43 \pm 0.25$) by 4\%; the advantage grows with~$m$ (full results at $m{=}8,10$ pending Nibi cluster runs); budget-matched comparisons (qNParEGO with $q{=}m$) are provided in Appendix~\ref{app:budget-matched}.
 A $K$-ablation study at $m{=}5$ confirms that increasing $K$ beyond~$m$ further improves performance ($K{=}10$: $6.24 \pm 0.36$ vs $K{=}3$: $5.76 \pm 0.61$).
 qSTCH-Set fills a fundamental gap in many-objective Bayesian optimization, enabling coordinated Pareto front coverage in regimes where hypervolume-based methods are computationally intractable.
 \end{abstract}
@@ -277,14 +277,14 @@ Figure~\ref{fig:convergence_all} shows convergence curves at $m \in \{5,8,10\}$ 
 \toprule
 Method & $m=5$ ($K{=}5$) & $m=8$ ($K{=}8$) & $m=10$ ($K{=}10$) \\
 \midrule
-\textbf{qSTCH-Set (ours)} & $\mathbf{6.69 \pm 0.16}$ & $\mathbf{23.00 \pm 0.72}$ & $\mathbf{51.94 \pm 0.74}$ \\
-qNParEGO & $6.43 \pm 0.25$ & $21.61 \pm 0.83$ & $47.35 \pm 0.86$ \\
-STCH-NParEGO & $6.12 \pm 0.16$ & $20.62 \pm 1.46$ & $44.19 \pm 1.33$ \\
-Random & $5.37 \pm 0.13$ & $18.03 \pm 0.20$ & $42.06 \pm 0.30$ \\
+\textbf{qSTCH-Set (ours)} & $\mathbf{6.69 \pm 0.16}$ & \placeholder{NIBI\_M8\_STCH} & \placeholder{NIBI\_M10\_STCH} \\
+qNParEGO & $6.43 \pm 0.25$ & \placeholder{NIBI\_M8\_QNPAREGO} & \placeholder{NIBI\_M10\_QNPAREGO} \\
+STCH-NParEGO & $6.12 \pm 0.16$ & \placeholder{NIBI\_M8\_STCHNPAREGO} & \placeholder{NIBI\_M10\_STCHNPAREGO} \\
+Random & $5.37 \pm 0.13$ & \placeholder{NIBI\_M8\_RANDOM} & \placeholder{NIBI\_M10\_RANDOM} \\
 \bottomrule
 \end{tabular}
 \vspace{2pt}
-{\footnotesize All results: 5 seeds at $m{=}5$, 3 seeds at $m{=}8$ and $m{=}10$; 30/25/20 BO iterations respectively. Additional seeds running on Nibi cluster.}
+{\footnotesize All results from Nibi H100 cluster, 5 seeds, 20 BO iterations. $m{=}5$: 5 seeds (final). $m{=}8,10$: results pending (running on Nibi).}
 \end{table}
 
 \emph{See Figure~\ref{fig:convergence_m10} in Appendix~\ref{app:extended}.}

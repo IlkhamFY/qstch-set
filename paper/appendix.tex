@@ -277,6 +277,13 @@ The qSTCH-Set acquisition landscape over $\Xset \in \X^K$ has dimension $K \cdot
 \paragraph{6. Statistical power.}
 The $m{=}10$ results for the $K{=}m{=}10$ comparison are based on 3~seeds. While the effect size is large (6.5\%, with non-overlapping $\pm 1\sigma$ intervals), full statistical validation with $\ge 10$ seeds is needed for publication-quality claims. A separate 5-seed run at $m{=}10$ with default $K$ confirms the ordering (qSTCH-Set $45.45 \pm 1.83$ vs qNParEGO $45.59 \pm 1.45$), but the $K{=}m$ advantage is only visible with $K{=}10$.
 
+\paragraph{7. Acquisition optimization scalability and the case for evolutionary solvers.}
+L-BFGS-B with 20 random restarts incurs increasing cost as the joint candidate space grows: at $m{=}8$, $K{=}8$, optimizing $K{\times}d = 96$ variables takes $\sim\!330$\,s per BO iteration on an H100 GPU; at $m{=}10$, $K{=}10$ ($d{=}14$, so $140$ variables) this rises further. The cost is dominated by the non-convex joint landscape rather than the forward pass: each restart must navigate a $Kd$-dimensional space with no global optimality guarantee, and restarts converging to poor local optima effectively waste compute.
+
+For the motivating application---continuous drug-like chemical spaces where $d \approx 20$--$50$ latent dimensions and $m = 20$--$50$ ADMET endpoints are realistic---the joint optimization space would reach $K{\times}d \approx 1{,}000$--$2{,}500$ variables. Gradient-based L-BFGS-B is unlikely to scale to this regime without structural modifications.
+
+Two directions are promising. First, \emph{trust-region BO}~\citep{daulton2022morbo} restricts acquisition optimization to a local trust region, reducing the effective dimension and sidestepping the worst non-convexities; it is compatible with qSTCH-Set's acquisition function as a drop-in replacement for the global optimizer. Second, \emph{evolutionary acquisition optimizers} such as CMA-ES are well-suited to moderate-dimensional ($\lesssim\!500$ variables) non-convex landscapes and require only zeroth-order access to the acquisition (no gradients), enabling direct optimization of the MC estimate even when the reparameterization trick is unavailable. A hybrid strategy---gradient-based L-BFGS-B within a trust region, CMA-ES for global exploration across restarts---may offer the best balance of speed and solution quality for many-objective DMTA loops. We leave this as a concrete direction for scaling qSTCH-Set to real molecular design problems.
+
 %=============================================================================
 \section{Budget-Matched Comparisons}
 \label{app:budget-matched}
