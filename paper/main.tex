@@ -88,6 +88,7 @@ Unlike discrete or generative molecular optimization, where the search space can
 In materials design, analogous trade-offs arise among strength, weight, cost, and corrosion resistance.
 When function evaluations are this expensive, multi-objective Bayesian optimization (MOBO) provides a principled, sample-efficient framework that fits Gaussian process (GP) surrogates to observed data and uses acquisition functions to guide evaluation~\citep{balandat2020botorch}.
 More broadly, qSTCH-Set is a natural acquisition oracle for generative molecular design: paired with a GFlowNet~\citep{bengio2021gflownet} or VAE decoder, it can steer a generative model to propose diverse, Pareto-optimal candidate sets rather than single-objective leads.
+Recent work has explored LLM and chemistry foundation model priors to improve single-objective BO for molecular discovery~\citep{Chen2025llmbo,Kristiadi2024soberlook}; combining such priors with multi-objective acquisition strategies like qSTCH-Set is a natural next step for data-efficient DMTA loops.
 
 However, existing MOBO methods face a fundamental scaling barrier in the number of objectives~$m$.
 Hypervolume-based acquisition functions---the gold standard for $m \le 4$---rely on non-dominated partitioning of the objective space, which is \#P-hard in~$m$~\citep{daulton2020qnehvi,daulton2021qnehvi,wang2024pohvi}.
