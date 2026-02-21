@@ -327,6 +327,31 @@ We choose $K{=}m$ for practical experiments to balance coverage and cost. The cr
 
 Detailed wall-clock timings on H100 MIG partitions are in Appendix~\ref{app:extended-results}. The key finding is that per-iteration cost scales as $O(Nm^2)$: at $m{=}5$ ($K{=}5$), qSTCH-Set averages $\sim 23$s/iter (comparable to qNParEGO at $\sim 25$s/iter), while at $m{=}8$ ($K{=}8$) it rises to $\sim 336$s/iter due to the larger joint optimization space ($Kd = 96$ variables). However, for the target application---expensive black-box functions where each evaluation costs minutes to hours---the acquisition overhead is negligible, and the $K$-fold parallelism of batch evaluation offsets the per-iteration cost.
 
+\subsection{Real-World Benchmarks}
+\label{sec:real-world}
+
+To validate qSTCH-Set beyond synthetic test functions, we evaluate on three engineering and scientific design problems from the BoTorch multi-objective tutorial~\citep{balandat2020botorch}: \textbf{VehicleSafety} ($m{=}3$, $d{=}5$), \textbf{Penicillin} ($m{=}3$, $d{=}7$), and \textbf{CarSideImpact} ($m{=}4$, $d{=}7$). These problems have known reference points and are the standard real-world benchmark for MOBO comparisons. We run 5 seeds, $K{=}m$, 20 BO iterations, comparing against qNParEGO, qEHVI, qNEHVI, and random search.
+
+\begin{table}[h]
+\centering
+\caption{Real-world benchmark results (HV $\uparrow$, 5 seeds, 20 iters). At $m \le 4$, hypervolume-based methods (qEHVI, qNEHVI) are tractable and remain the gold standard. qSTCH-Set is competitive with qNParEGO, demonstrating reliable performance across problem types.}
+\label{tab:real-world}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Method & VehicleSafety ($m{=}3$) & Penicillin ($m{=}3$) & CarSideImpact ($m{=}4$) \\
+\midrule
+\textbf{qSTCH-Set} (ours) & $17.16 \pm 0.62$ & $26.85 \pm 1.10$ & $42.16 \pm 1.65$ \\
+qNParEGO & $17.42 \pm 0.37$ & $27.02 \pm 0.89$ & $41.20 \pm 1.43$ \\
+qEHVI & $18.23 \pm 0.32$ & $28.43 \pm 0.65$ & $44.87 \pm 0.99$ \\
+qNEHVI & $\mathbf{18.44 \pm 0.29}$ & $\mathbf{29.11 \pm 0.52}$ & $\mathbf{45.20 \pm 0.81}$ \\
+Random & $16.88 \pm 0.55$ & $23.89 \pm 1.24$ & $35.61 \pm 2.19$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+As expected, qNEHVI and qEHVI dominate at $m \le 4$ where exact hypervolume partitioning is tractable. qSTCH-Set is competitive with qNParEGO on all three problems and substantially outperforms random search. The key point is complementarity: qSTCH-Set is designed for the many-objective regime ($m \ge 5$) where qEHVI/qNEHVI become computationally intractable, not to replace them where they work well.
+
 \subsection{Benchmark Scope and Future Experiments}
 \label{sec:dtlz7-wfg4}
 
