@@ -46,7 +46,7 @@ PROBLEM_MAP = {
 }
 
 N_BATCH = 20
-MC_SAMPLES = 128
+MC_SAMPLES = 128  # overridden by --mc-samples arg
 
 
 def get_problem(name: str, device, dtype):
@@ -185,7 +185,7 @@ def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batc
     return new_x, new_obj, new_obj_true
 
 
-def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dtype):
+def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dtype, mc_samples: int = 128):
     problem = get_problem(problem_name, device, dtype)
     num_obj = problem.num_objectives
     batch_size = num_obj  # K = m rule
@@ -193,7 +193,7 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
     bounds = problem.bounds.to(device=device, dtype=dtype)
 
     print(f"\n{'='*60}")
-    print(f"Problem: {problem_name} | m={num_obj} | d={problem.dim} | K={batch_size} | seeds={n_seeds}")
+    print(f"Problem: {problem_name} | m={num_obj} | d={problem.dim} | K={batch_size} | seeds={n_seeds} | MC={mc_samples}")
     print(f"{'='*60}")
 
     methods = ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"]
@@ -226,7 +226,7 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
                 d = data[method]
                 mll, model = initialize_model(d["train_x"], d["train_obj"], bounds)
                 fit_gpytorch_mll(mll)
-                sampler = SobolQMCNormalSampler(sample_shape=torch.Size([MC_SAMPLES]))
+                sampler = SobolQMCNormalSampler(sample_shape=torch.Size([mc_samples]))
 
                 if method == "qnparego":
                     new_x, new_obj, new_obj_true = optimize_qnparego(
@@ -275,6 +275,13 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
 
         for method in methods:
             all_results[method].append(hvs[method])
+
+        # Save final Pareto fronts for plotting
+        all_results.setdefault("_pareto_fronts", {m: [] for m in methods})
+        for method in methods:
+            Y = data[method]["train_obj_true"]
+            mask = is_non_dominated(Y)
+            all_results["_pareto_fronts"][method].append(Y[mask].cpu().tolist())
 
     # Save results
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -326,20 +333,59 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
             ax.fill_between(iters, mean - std, mean + std, alpha=0.15, color=colors[method])
         ax.set_xlabel("BO Iteration")
         ax.set_ylabel("Hypervolume")
-        ax.set_title(f"{problem_name} (m={num_obj}, K={batch_size}, {n_seeds} seeds)")
+        ax.set_title(f"{problem_name} (m={num_obj}, K={batch_size}, {n_seeds} seeds, MC={mc_samples})")
         ax.legend(fontsize=9)
         ax.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig(output_dir / "hv_plot.png", dpi=150, bbox_inches="tight")
-        print(f"Plot saved.")
+        print(f"Convergence plot saved.")
     except Exception as e:
-        print(f"Plot failed: {e}")
+        print(f"Convergence plot failed: {e}")
+
+    # Plot Pareto fronts (2D projections for m=3; obj 0 vs 1, 0 vs 2, 1 vs 2 for m=4)
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        pareto_data = all_results.get("_pareto_fronts", {})
+        if pareto_data and num_obj <= 4:
+            pairs = [(0, 1)] if num_obj == 2 else [(0, 1), (0, 2), (1, 2)]
+            fig, axes = plt.subplots(1, len(pairs), figsize=(5 * len(pairs), 4.5))
+            if len(pairs) == 1:
+                axes = [axes]
+            for ax, (i, j) in zip(axes, pairs):
+                for method in methods:
+                    pts_all = pareto_data.get(method, [])
+                    # Aggregate all seeds
+                    all_pts = []
+                    for seed_pts in pts_all:
+                        all_pts.extend(seed_pts)
+                    if not all_pts:
+                        continue
+                    arr = np.array(all_pts)
+                    # negate back to original minimization space for plotting
+                    ax.scatter(-arr[:, i], -arr[:, j],
+                               label=labels[method], color=colors[method],
+                               alpha=0.5, s=15)
+                ax.set_xlabel(f"$f_{{{i+1}}}$")
+                ax.set_ylabel(f"$f_{{{j+1}}}$")
+                ax.set_title(f"{problem_name}: $f_{{{i+1}}}$ vs $f_{{{j+1}}}$")
+                ax.legend(fontsize=7, markerscale=2)
+                ax.grid(True, alpha=0.3)
+            plt.suptitle(f"{problem_name} — Final Pareto Fronts (all seeds)", fontsize=12)
+            plt.tight_layout()
+            plt.savefig(output_dir / "pareto_fronts.png", dpi=150, bbox_inches="tight")
+            print(f"Pareto front plot saved.")
+    except Exception as e:
+        print(f"Pareto front plot failed: {e}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem", required=True, choices=list(PROBLEM_MAP.keys()))
     parser.add_argument("--seeds", type=int, default=5)
+    parser.add_argument("--mc-samples", type=int, default=128,
+                        help="Number of MC samples for acquisition function (default 128, use 512 for higher fidelity)")
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -349,8 +395,8 @@ if __name__ == "__main__":
     device = torch.device(args.device)
 
     if args.output_dir is None:
-        out = Path(__file__).parent.parent / "results" / f"real_world_{args.problem.lower()}"
+        out = Path(__file__).parent.parent / "results" / f"real_world_{args.problem.lower()}_mc{args.mc_samples}"
     else:
         out = Path(args.output_dir)
 
-    run_benchmark(args.problem, args.seeds, out, device, dtype)
+    run_benchmark(args.problem, args.seeds, out, device, dtype, mc_samples=args.mc_samples)
