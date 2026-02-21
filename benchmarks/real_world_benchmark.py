@@ -29,11 +29,10 @@ from botorch.test_functions.multi_objective import (
 from botorch.utils.multi_objective.box_decompositions.dominated import (
     DominatedPartitioning,
 )
-from botorch.utils.multi_objective.pareto import is_non_dominated
-from botorch.utils.sampling import draw_sobol_samples
+from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
+from botorch.utils.sampling import draw_sobol_samples, sample_simplex
 from botorch.utils.transforms import normalize, unnormalize
 from gpytorch.mlls.sum_marginal_log_likelihood import SumMarginalLogLikelihood
-from torch.quasirandom import SobolEngine
 
 from stch_botorch.acquisition.stch_set_bo import qSTCHSet
 
@@ -48,7 +47,6 @@ PROBLEM_MAP = {
 
 N_BATCH = 20
 MC_SAMPLES = 128
-BATCH_SIZE = None  # set to problem.num_objectives (K=m rule)
 
 
 def get_problem(name: str, device, dtype):
@@ -66,47 +64,45 @@ def generate_initial_data(problem, n, device, dtype):
 
 
 def initialize_model(train_x, train_obj, bounds):
-    train_x_normalized = normalize(train_x, bounds)
-    models = []
-    for i in range(train_obj.shape[-1]):
-        models.append(
-            SingleTaskGP(
-                train_x_normalized,
-                train_obj[..., i : i + 1],
-                outcome_transform=Standardize(m=1),
-            )
+    train_x_norm = normalize(train_x, bounds)
+    models = [
+        SingleTaskGP(
+            train_x_norm,
+            train_obj[..., i: i + 1],
+            outcome_transform=Standardize(m=1),
         )
+        for i in range(train_obj.shape[-1])
+    ]
     model = ModelListGP(*models)
     mll = SumMarginalLogLikelihood(model.likelihood, model)
     return mll, model
 
 
-def optimize_qnparego(model, train_x, train_obj, sampler, bounds, batch_size):
-    from botorch.acquisition.monte_carlo import qNoisyExpectedImprovement
-    from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
-    from botorch.utils.sampling import sample_simplex
+def unit_bounds(d, device, dtype):
+    return torch.stack([torch.zeros(d, device=device, dtype=dtype),
+                        torch.ones(d, device=device, dtype=dtype)])
 
-    train_x_normalized = normalize(train_x, bounds)
+
+def optimize_qnparego(problem, model, train_x, train_obj, sampler, bounds, batch_size, device, dtype):
+    from botorch.acquisition.monte_carlo import qNoisyExpectedImprovement
+    train_x_norm = normalize(train_x, bounds)
     with torch.no_grad():
-        pred = model.posterior(train_x_normalized).mean
-    acq_func_list = []
+        pred = model.posterior(train_x_norm).mean
+    candidates_list = []
     for _ in range(batch_size):
-        weights = sample_simplex(train_obj.shape[-1]).squeeze()
+        # Fix: ensure weights on same device/dtype as Y
+        weights = sample_simplex(train_obj.shape[-1]).squeeze().to(device=device, dtype=dtype)
         objective = get_chebyshev_scalarization(weights=weights, Y=pred)
         acq = qNoisyExpectedImprovement(
             model=model,
-            X_baseline=train_x_normalized,
+            X_baseline=train_x_norm,
             sampler=sampler,
             objective=objective,
             prune_baseline=True,
         )
-        acq_func_list.append(acq)
-    from botorch.acquisition.cached_cholesky import CachedCholeskyMCSamplerMixin
-    candidates_list = []
-    for acq in acq_func_list:
         cand, _ = optimize_acqf(
             acq_function=acq,
-            bounds=torch.stack([torch.zeros(bounds.shape[1]), torch.ones(bounds.shape[1])]),
+            bounds=unit_bounds(bounds.shape[1], device, dtype),
             q=1,
             num_restarts=10,
             raw_samples=512,
@@ -120,8 +116,8 @@ def optimize_qnparego(model, train_x, train_obj, sampler, bounds, batch_size):
     return new_x, new_obj, new_obj_true
 
 
-def optimize_qehvi(model, train_obj_true, sampler, bounds, batch_size, ref_point):
-    train_x_normalized = normalize(train_x, bounds)
+def optimize_qehvi(problem, model, train_x, train_obj_true, sampler, bounds, batch_size, ref_point, device, dtype):
+    train_x_norm = normalize(train_x, bounds)
     partitioning = DominatedPartitioning(ref_point=ref_point, Y=train_obj_true)
     acq = qLogExpectedHypervolumeImprovement(
         model=model,
@@ -131,7 +127,7 @@ def optimize_qehvi(model, train_obj_true, sampler, bounds, batch_size, ref_point
     )
     candidates, _ = optimize_acqf(
         acq_function=acq,
-        bounds=torch.stack([torch.zeros(bounds.shape[1]), torch.ones(bounds.shape[1])]),
+        bounds=unit_bounds(bounds.shape[1], device, dtype),
         q=batch_size,
         num_restarts=10,
         raw_samples=512,
@@ -143,18 +139,18 @@ def optimize_qehvi(model, train_obj_true, sampler, bounds, batch_size, ref_point
     return new_x, new_obj, new_obj_true
 
 
-def optimize_qnehvi(model, train_x, train_obj, sampler, bounds, batch_size, ref_point):
-    train_x_normalized = normalize(train_x, bounds)
+def optimize_qnehvi(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype):
+    train_x_norm = normalize(train_x, bounds)
     acq = qLogNoisyExpectedHypervolumeImprovement(
         model=model,
         ref_point=ref_point,
-        X_baseline=train_x_normalized,
+        X_baseline=train_x_norm,
         sampler=sampler,
         prune_baseline=True,
     )
     candidates, _ = optimize_acqf(
         acq_function=acq,
-        bounds=torch.stack([torch.zeros(bounds.shape[1]), torch.ones(bounds.shape[1])]),
+        bounds=unit_bounds(bounds.shape[1], device, dtype),
         q=batch_size,
         num_restarts=10,
         raw_samples=512,
@@ -166,12 +162,9 @@ def optimize_qnehvi(model, train_x, train_obj, sampler, bounds, batch_size, ref_
     return new_x, new_obj, new_obj_true
 
 
-def optimize_qstch_set(model, train_x, train_obj, sampler, bounds, batch_size):
-    train_x_normalized = normalize(train_x, bounds)
+def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batch_size, device, dtype):
     num_obj = train_obj.shape[-1]
-    # Generate K=m weight vectors (uniform simplex)
-    from botorch.utils.sampling import sample_simplex
-    weight_vectors = sample_simplex(num_obj, n=batch_size)  # (K, m)
+    weight_vectors = sample_simplex(num_obj, n=batch_size).to(device=device, dtype=dtype)
     acq = qSTCHSet(
         model=model,
         K=batch_size,
@@ -180,7 +173,7 @@ def optimize_qstch_set(model, train_x, train_obj, sampler, bounds, batch_size):
     )
     candidates, _ = optimize_acqf(
         acq_function=acq,
-        bounds=torch.stack([torch.zeros(bounds.shape[1]), torch.ones(bounds.shape[1])]),
+        bounds=unit_bounds(bounds.shape[1], device, dtype),
         q=batch_size,
         num_restarts=10,
         raw_samples=512,
@@ -199,27 +192,32 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
     ref_point = problem.ref_point.to(device=device, dtype=dtype)
     bounds = problem.bounds.to(device=device, dtype=dtype)
 
-    all_results = {m: [] for m in ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"]}
+    print(f"\n{'='*60}")
+    print(f"Problem: {problem_name} | m={num_obj} | d={problem.dim} | K={batch_size} | seeds={n_seeds}")
+    print(f"{'='*60}")
+
+    methods = ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"]
+    all_results = {m: [] for m in methods}
 
     for seed in range(n_seeds):
         torch.manual_seed(seed)
-        print(f"\n[{problem_name}] Seed {seed+1}/{n_seeds}")
+        print(f"\n--- Seed {seed+1}/{n_seeds} ---")
 
         n_init = 2 * (problem.dim + 1)
         train_x, train_obj, train_obj_true = generate_initial_data(problem, n_init, device, dtype)
 
-        # clone initial data for all methods
-        data = {}
-        for method in ["qnparego", "qehvi", "qnehvi", "qstch_set", "random"]:
-            data[method] = {
+        data = {
+            method: {
                 "train_x": train_x.clone(),
                 "train_obj": train_obj.clone(),
                 "train_obj_true": train_obj_true.clone(),
             }
+            for method in methods
+        }
 
         bd = DominatedPartitioning(ref_point=ref_point, Y=train_obj_true)
         init_hv = bd.compute_hypervolume().item()
-        hvs = {m: [init_hv] for m in all_results}
+        hvs = {m: [init_hv] for m in methods}
 
         for iteration in range(1, N_BATCH + 1):
             t0 = time.monotonic()
@@ -231,23 +229,24 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
                 sampler = SobolQMCNormalSampler(sample_shape=torch.Size([MC_SAMPLES]))
 
                 if method == "qnparego":
-                    global train_x, problem
-                    train_x = d["train_x"]
                     new_x, new_obj, new_obj_true = optimize_qnparego(
-                        model, d["train_x"], d["train_obj"], sampler, bounds, batch_size
+                        problem, model, d["train_x"], d["train_obj"],
+                        sampler, bounds, batch_size, device, dtype
                     )
                 elif method == "qehvi":
-                    train_x = d["train_x"]
                     new_x, new_obj, new_obj_true = optimize_qehvi(
-                        model, d["train_obj_true"], sampler, bounds, batch_size, ref_point
+                        problem, model, d["train_x"], d["train_obj_true"],
+                        sampler, bounds, batch_size, ref_point, device, dtype
                     )
                 elif method == "qnehvi":
                     new_x, new_obj, new_obj_true = optimize_qnehvi(
-                        model, d["train_x"], d["train_obj"], sampler, bounds, batch_size, ref_point
+                        problem, model, d["train_x"], d["train_obj"],
+                        sampler, bounds, batch_size, ref_point, device, dtype
                     )
                 elif method == "qstch_set":
                     new_x, new_obj, new_obj_true = optimize_qstch_set(
-                        model, d["train_x"], d["train_obj"], sampler, bounds, batch_size
+                        problem, model, d["train_x"], d["train_obj"],
+                        sampler, bounds, batch_size, device, dtype
                     )
 
                 d["train_x"] = torch.cat([d["train_x"], new_x])
@@ -262,71 +261,88 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
             data["random"]["train_obj"] = torch.cat([data["random"]["train_obj"], new_obj_rand])
             data["random"]["train_obj_true"] = torch.cat([data["random"]["train_obj_true"], new_obj_true_rand])
 
-            for method in all_results:
-                bd = DominatedPartitioning(ref_point=ref_point, Y=data[method]["train_obj_true"])
+            for method in methods:
+                bd = DominatedPartitioning(
+                    ref_point=ref_point, Y=data[method]["train_obj_true"]
+                )
                 hvs[method].append(bd.compute_hypervolume().item())
 
             t1 = time.monotonic()
-            hv_str = " | ".join(f"{m}={hvs[m][-1]:.2f}" for m in ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"])
-            print(f"  Iter {iteration:>2}: {hv_str} ({t1-t0:.1f}s)")
+            hv_str = " | ".join(
+                f"{m}={hvs[m][-1]:.3f}" for m in ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"]
+            )
+            print(f"  Iter {iteration:>2}/{N_BATCH}: {hv_str} ({t1-t0:.1f}s)")
 
-        for method in all_results:
+        for method in methods:
             all_results[method].append(hvs[method])
 
     # Save results
     output_dir.mkdir(parents=True, exist_ok=True)
     import numpy as np
+
     summary = {
         "problem": problem_name,
         "n_seeds": n_seeds,
         "n_batch": N_BATCH,
         "batch_size": batch_size,
         "num_objectives": num_obj,
+        "dim": problem.dim,
     }
     for method, runs in all_results.items():
         arr = np.array(runs)
         summary[method] = {
-            "mean": arr.mean(axis=0).tolist(),
-            "std": arr.std(axis=0).tolist(),
+            "hv_mean": arr.mean(axis=0).tolist(),
+            "hv_std": arr.std(axis=0).tolist(),
             "final_hv_mean": float(arr[:, -1].mean()),
             "final_hv_std": float(arr[:, -1].std()),
         }
-        print(f"  {method}: final HV = {summary[method]['final_hv_mean']:.4f} ± {summary[method]['final_hv_std']:.4f}")
+
+    print(f"\n{'='*60}")
+    print(f"Final HV ({problem_name}):")
+    labels = {"random": "Sobol", "qnparego": "qNParEGO", "qehvi": "qEHVI",
+              "qnehvi": "qNEHVI", "qstch_set": "qSTCH-Set"}
+    for method in methods:
+        r = summary[method]
+        print(f"  {labels[method]:15s}: {r['final_hv_mean']:.4f} ± {r['final_hv_std']:.4f}")
+    print(f"{'='*60}")
 
     with open(output_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2)
     print(f"Saved to {output_dir / 'summary.json'}")
 
-    # Plot
+    # Plot convergence
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        import numpy as np
-        fig, ax = plt.subplots(figsize=(8, 5))
-        colors = {"random": "C0", "qnparego": "C1", "qehvi": "C2", "qnehvi": "C3", "qstch_set": "C4"}
-        labels = {"random": "Sobol", "qnparego": "qNParEGO", "qehvi": "qEHVI", "qnehvi": "qNEHVI", "qstch_set": "qSTCH-Set (ours)"}
+        colors = {"random": "#888", "qnparego": "#e41a1c", "qehvi": "#377eb8",
+                  "qnehvi": "#4daf4a", "qstch_set": "#984ea3"}
+        fig, ax = plt.subplots(figsize=(7, 4.5))
         iters = list(range(N_BATCH + 1))
-        for method in ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"]:
-            mean = np.array(summary[method]["mean"])
-            std = np.array(summary[method]["std"])
-            ax.plot(iters, mean, label=labels[method], color=colors[method])
+        for method in methods:
+            mean = np.array(summary[method]["hv_mean"])
+            std = np.array(summary[method]["hv_std"])
+            ax.plot(iters, mean, label=labels[method], color=colors[method], linewidth=2)
             ax.fill_between(iters, mean - std, mean + std, alpha=0.15, color=colors[method])
-        ax.set_xlabel("Number of observations (beyond initial points)")
+        ax.set_xlabel("BO Iteration")
         ax.set_ylabel("Hypervolume")
-        ax.set_title(f"{problem_name} — HV vs Iterations")
-        ax.legend()
+        ax.set_title(f"{problem_name} (m={num_obj}, K={batch_size}, {n_seeds} seeds)")
+        ax.legend(fontsize=9)
+        ax.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig(output_dir / "hv_plot.png", dpi=150)
-        print(f"Plot saved to {output_dir / 'hv_plot.png'}")
+        plt.savefig(output_dir / "hv_plot.png", dpi=150, bbox_inches="tight")
+        print(f"Plot saved.")
     except Exception as e:
         print(f"Plot failed: {e}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--problem", type=str, required=True, choices=list(PROBLEM_MAP.keys()))
+    parser.add_argument("--problem", required=True, choices=list(PROBLEM_MAP.keys()))
     parser.add_argument("--seeds", type=int, default=5)
     parser.add_argument("--output-dir", type=str, default=None)
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--device", type=str,
+                        default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
     dtype = torch.double
