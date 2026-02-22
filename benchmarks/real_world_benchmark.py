@@ -29,6 +29,9 @@ from botorch.test_functions.multi_objective import (
 from botorch.utils.multi_objective.box_decompositions.dominated import (
     DominatedPartitioning,
 )
+from botorch.utils.multi_objective.box_decompositions.non_dominated import (
+    FastNondominatedPartitioning,
+)
 from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
 from botorch.utils.multi_objective.pareto import is_non_dominated
 from botorch.utils.sampling import draw_sobol_samples, sample_simplex
@@ -85,15 +88,20 @@ def unit_bounds(d, device, dtype):
 
 
 def optimize_qnparego(problem, model, train_x, train_obj, sampler, bounds, batch_size, device, dtype):
+    """qNParEGO: sequential greedy optimization with random Chebyshev scalarizations.
+    Follows official BoTorch tutorial: optimize_acqf_list with per-candidate scalarizations."""
     from botorch.acquisition.monte_carlo import qNoisyExpectedImprovement
+    from botorch.acquisition.objective import GenericMCObjective
+    from botorch.optim.optimize import optimize_acqf_list
     train_x_norm = normalize(train_x, bounds)
     with torch.no_grad():
         pred = model.posterior(train_x_norm).mean
-    candidates_list = []
+    acq_func_list = []
     for _ in range(batch_size):
-        # Fix: ensure weights on same device/dtype as Y
         weights = sample_simplex(train_obj.shape[-1]).squeeze().to(device=device, dtype=dtype)
-        objective = get_chebyshev_scalarization(weights=weights, Y=pred)
+        objective = GenericMCObjective(
+            get_chebyshev_scalarization(weights=weights, Y=pred)
+        )
         acq = qNoisyExpectedImprovement(
             model=model,
             X_baseline=train_x_norm,
@@ -101,25 +109,28 @@ def optimize_qnparego(problem, model, train_x, train_obj, sampler, bounds, batch
             objective=objective,
             prune_baseline=True,
         )
-        cand, _ = optimize_acqf(
-            acq_function=acq,
-            bounds=unit_bounds(bounds.shape[1], device, dtype),
-            q=1,
-            num_restarts=10,
-            raw_samples=512,
-            options={"batch_limit": 5, "maxiter": 200},
-        )
-        candidates_list.append(cand)
-    candidates = torch.cat(candidates_list, dim=-2)
+        acq_func_list.append(acq)
+    # optimize_acqf_list: sequential greedy, conditions each candidate on previous
+    candidates, _ = optimize_acqf_list(
+        acq_function_list=acq_func_list,
+        bounds=unit_bounds(bounds.shape[1], device, dtype),
+        num_restarts=10,
+        raw_samples=512,
+        options={"batch_limit": 5, "maxiter": 200},
+    )
     new_x = unnormalize(candidates.detach(), bounds)
     new_obj_true = problem(new_x)
     new_obj = new_obj_true + torch.randn_like(new_obj_true) * 1e-6
     return new_x, new_obj, new_obj_true
 
 
-def optimize_qehvi(problem, model, train_x, train_obj_true, sampler, bounds, batch_size, ref_point, device, dtype):
+def optimize_qehvi(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype):
+    """qEHVI: partitions non-dominated space using posterior mean (not true Y).
+    Follows official BoTorch tutorial pattern."""
     train_x_norm = normalize(train_x, bounds)
-    partitioning = DominatedPartitioning(ref_point=ref_point, Y=train_obj_true)
+    with torch.no_grad():
+        pred = model.posterior(train_x_norm).mean
+    partitioning = FastNondominatedPartitioning(ref_point=ref_point, Y=pred)
     acq = qLogExpectedHypervolumeImprovement(
         model=model,
         ref_point=ref_point,
@@ -133,6 +144,7 @@ def optimize_qehvi(problem, model, train_x, train_obj_true, sampler, bounds, bat
         num_restarts=10,
         raw_samples=512,
         options={"batch_limit": 5, "maxiter": 200},
+        sequential=True,
     )
     new_x = unnormalize(candidates.detach(), bounds)
     new_obj_true = problem(new_x)
@@ -141,6 +153,8 @@ def optimize_qehvi(problem, model, train_x, train_obj_true, sampler, bounds, bat
 
 
 def optimize_qnehvi(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype):
+    """qNEHVI: noisy expected HVI with cached box decomposition.
+    Follows official BoTorch tutorial pattern."""
     train_x_norm = normalize(train_x, bounds)
     acq = qLogNoisyExpectedHypervolumeImprovement(
         model=model,
@@ -156,6 +170,7 @@ def optimize_qnehvi(problem, model, train_x, train_obj, sampler, bounds, batch_s
         num_restarts=10,
         raw_samples=512,
         options={"batch_limit": 5, "maxiter": 200},
+        sequential=True,
     )
     new_x = unnormalize(candidates.detach(), bounds)
     new_obj_true = problem(new_x)
@@ -235,7 +250,7 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
                     )
                 elif method == "qehvi":
                     new_x, new_obj, new_obj_true = optimize_qehvi(
-                        problem, model, d["train_x"], d["train_obj_true"],
+                        problem, model, d["train_x"], d["train_obj"],
                         sampler, bounds, batch_size, ref_point, device, dtype
                     )
                 elif method == "qnehvi":
