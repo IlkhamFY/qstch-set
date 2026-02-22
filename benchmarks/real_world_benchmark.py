@@ -162,13 +162,11 @@ def optimize_qnehvi(problem, model, train_x, train_obj, sampler, bounds, batch_s
     return new_x, new_obj, new_obj_true
 
 
-def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batch_size, device, dtype):
-    num_obj = train_obj.shape[-1]
-    weight_vectors = sample_simplex(num_obj, n=batch_size).to(device=device, dtype=dtype)
+def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype):
     acq = qSTCHSet(
         model=model,
-        K=batch_size,
-        weight_vectors=weight_vectors,
+        ref_point=ref_point,
+        mu=0.1,
         sampler=sampler,
     )
     candidates, _ = optimize_acqf(
@@ -246,7 +244,7 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
                 elif method == "qstch_set":
                     new_x, new_obj, new_obj_true = optimize_qstch_set(
                         problem, model, d["train_x"], d["train_obj"],
-                        sampler, bounds, batch_size, device, dtype
+                        sampler, bounds, batch_size, ref_point, device, dtype
                     )
 
                 d["train_x"] = torch.cat([d["train_x"], new_x])
