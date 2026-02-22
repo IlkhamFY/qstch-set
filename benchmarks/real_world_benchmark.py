@@ -30,6 +30,7 @@ from botorch.utils.multi_objective.box_decompositions.dominated import (
     DominatedPartitioning,
 )
 from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
+from botorch.utils.multi_objective.pareto import is_non_dominated
 from botorch.utils.sampling import draw_sobol_samples, sample_simplex
 from botorch.utils.transforms import normalize, unnormalize
 from gpytorch.mlls.sum_marginal_log_likelihood import SumMarginalLogLikelihood
@@ -196,6 +197,7 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
 
     methods = ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"]
     all_results = {m: [] for m in methods}
+    pareto_fronts = {m: [] for m in methods}
 
     for seed in range(n_seeds):
         torch.manual_seed(seed)
@@ -275,11 +277,10 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
             all_results[method].append(hvs[method])
 
         # Save final Pareto fronts for plotting
-        all_results.setdefault("_pareto_fronts", {m: [] for m in methods})
         for method in methods:
             Y = data[method]["train_obj_true"]
             mask = is_non_dominated(Y)
-            all_results["_pareto_fronts"][method].append(Y[mask].cpu().tolist())
+            pareto_fronts[method].append(Y[mask].cpu().tolist())
 
     # Save results
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -293,13 +294,15 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
         "num_objectives": num_obj,
         "dim": problem.dim,
     }
-    for method, runs in all_results.items():
+    for method in methods:
+        runs = all_results[method]
         arr = np.array(runs)
         summary[method] = {
             "hv_mean": arr.mean(axis=0).tolist(),
             "hv_std": arr.std(axis=0).tolist(),
             "final_hv_mean": float(arr[:, -1].mean()),
             "final_hv_std": float(arr[:, -1].std()),
+            "hv_all": arr.tolist(),
         }
 
     print(f"\n{'='*60}")
@@ -345,7 +348,7 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        pareto_data = all_results.get("_pareto_fronts", {})
+        pareto_data = pareto_fronts
         if pareto_data and num_obj <= 4:
             pairs = [(0, 1)] if num_obj == 2 else [(0, 1), (0, 2), (1, 2)]
             fig, axes = plt.subplots(1, len(pairs), figsize=(5 * len(pairs), 4.5))
