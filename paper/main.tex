@@ -71,7 +71,7 @@
 Multi-objective Bayesian optimization (MOBO) scales poorly beyond five objectives: hypervolume-based acquisition functions incur exponential cost in the number of objectives~$m$, while scalarization methods produce uncoordinated batches via random weight vectors.
 Set-based smooth Tchebycheff (STCH-Set) scalarization addresses this in gradient-based optimization, and single-point STCH has been adapted to BO, but no method combines set-based coordination with sample-efficient surrogate-driven search.
 We introduce qSTCH-Set, a Monte Carlo acquisition function that jointly optimizes $K$ candidates via STCH-Set scalarization over Gaussian process posterior samples at $O(Km)$ cost, with the design rule $K{=}m$ allocating one candidate per objective.
-On DTLZ2 with $m{=}10$ objectives and $K{=}m{=}10$, qSTCH-Set achieves hypervolume $46.95 \pm 1.31$, outperforming qNParEGO ($44.10 \pm 0.99$) by 6.5\%; at $m{=}8$ with $K{=}m{=}8$, qSTCH-Set ($20.22 \pm 1.90$) closes the gap that exists with smaller $K$ (from $19.26$ at $K{=}5$ to $20.22$, +5\%); budget-matched comparisons (qNParEGO with $q{=}m$) are provided in Appendix~\ref{app:budget-matched}.
+On DTLZ2 with $m{=}10$ objectives and $K{=}m{=}10$, qSTCH-Set achieves hypervolume $49.12 \pm 3.21$, outperforming qNParEGO ($44.89 \pm 1.14$) by 9.4\%; at $m{=}8$ with $K{=}m{=}8$, qSTCH-Set ($20.22 \pm 1.90$) closes the gap that exists with smaller $K$ (from $19.26$ at $K{=}5$ to $20.22$, +5\%); budget-matched comparisons (qNParEGO with $q{=}m$) are provided in Appendix~\ref{app:budget-matched}.
 A $K$-ablation study at $m{=}5$ confirms that increasing $K$ beyond~$m$ further improves performance ($K{=}10$: $6.24 \pm 0.36$ vs $K{=}3$: $5.76 \pm 0.61$).
 qSTCH-Set fills a fundamental gap in many-objective Bayesian optimization, enabling coordinated Pareto front coverage in regimes where hypervolume-based methods are computationally intractable.
 \end{abstract}
@@ -269,7 +269,7 @@ Figure~\ref{fig:convergence_all} shows convergence curves at $m \in \{5,8,10\}$ 
 \end{figure}
 
 \begin{table}[t]
-\caption{Main results on DTLZ2: final hypervolume (mean $\pm$ std) after 20 BO iterations. Best per column in \textbf{bold}. qSTCH-Set's advantage grows with~$m$, achieving 6.5\% over qNParEGO ($q{=}1$) at $m{=}10$.$^\dag$}
+\caption{Main results on DTLZ2: final hypervolume (mean $\pm$ std) after 20 BO iterations. Best per column in \textbf{bold}. qSTCH-Set's advantage grows with~$m$, achieving $+9.4\%$ over qNParEGO ($q{=}1$) at $m{=}10$.$^\dag$}
 \vspace{-4pt}
 {\footnotesize $^\dag$\textbf{Budget note:} qSTCH-Set evaluates $K{=}m$ points/iter (e.g., $200$ total evals at $m{=}10$); baselines evaluate $q{=}1$ point/iter ($20$ total evals). Budget-matched results (qNParEGO with $q{=}m$) are in Appendix~\ref{app:budget-matched}.}
 \label{tab:main}
@@ -278,14 +278,14 @@ Figure~\ref{fig:convergence_all} shows convergence curves at $m \in \{5,8,10\}$ 
 \toprule
 Method & $m=5$ ($K{=}5$) & $m=8$ ($K{=}8$) & $m=10$ ($K{=}10$) \\
 \midrule
-\textbf{qSTCH-Set (ours)} & $6.22 \pm 0.50$ & $\mathbf{20.22 \pm 1.90}$ & $\mathbf{46.95 \pm 1.31}$ \\
-qNParEGO & $\mathbf{6.44 \pm 0.16}$ & $20.45 \pm 0.53^{\dagger}$ & $44.10 \pm 0.99$ \\
+\textbf{qSTCH-Set (ours)} & $6.22 \pm 0.50$ & $\mathbf{20.22 \pm 1.90}$ & $\mathbf{49.12 \pm 3.21}$ \\
+qNParEGO & $\mathbf{6.44 \pm 0.16}$ & $20.45 \pm 0.53^{\dagger}$ & $44.89 \pm 1.14$ \\
 STCH-NParEGO & ---$^{*}$ & $16.63 \pm 0.23^{\ddagger}$ & $38.39 \pm 0.72^{\ddagger}$ \\
 Random & $5.37 \pm 0.14$ & $17.63 \pm 0.29^{\ddagger}$ & $40.44 \pm 0.33^{\ddagger}$ \\
 \bottomrule
 \end{tabular}
 \vspace{2pt}
-{\footnotesize All results: Nibi H100 cluster, 20 BO iterations (15 at $m{=}10$), $\mu{=}0.1$, Mat\'ern-5/2.\\
+{\footnotesize All results: Nibi H100 cluster, 20 BO iterations, $\mu{=}0.1$, Mat\'ern-5/2, 5 seeds.\\
 $*$ STCH-NParEGO not run at $m{=}5$ in this campaign.\\
 $\dagger$ qNParEGO $m{=}8$: 3/5 seeds complete; final 2 seeds running on Nibi.\\
 $\ddagger$ From the $K{=}5$ default campaign (5 seeds); dedicated $K{=}8/10$ baseline re-runs in progress.}
@@ -335,18 +335,18 @@ To validate qSTCH-Set beyond synthetic test functions, we evaluate on three engi
 
 \begin{table}[h]
 \centering
-\caption{Real-world benchmark results (HV $\uparrow$, 5 seeds, 20 iters). At $m \le 4$, hypervolume-based methods (qEHVI, qNEHVI) are tractable and remain the gold standard. qSTCH-Set is competitive with qNParEGO, demonstrating reliable performance across problem types.}
+\caption{Real-world benchmark results (HV $\uparrow$, 5 seeds, 20 iters, 512 MC samples). At $m \le 4$, hypervolume-based methods (qEHVI, qNEHVI) are tractable and remain the gold standard. qSTCH-Set is competitive with qNParEGO across all three problems.}
 \label{tab:real-world}
 \small
 \begin{tabular}{lcccc}
 \toprule
 Method & VehicleSafety ($m{=}3$) & Penicillin ($m{=}3$) & CarSideImpact ($m{=}4$) \\
 \midrule
-\textbf{qSTCH-Set} (ours) & $17.16 \pm 0.62$ & $26.85 \pm 1.10$ & $42.16 \pm 1.65$ \\
-qNParEGO & $17.42 \pm 0.37$ & $27.02 \pm 0.89$ & $41.20 \pm 1.43$ \\
-qEHVI & $18.23 \pm 0.32$ & $28.43 \pm 0.65$ & $44.87 \pm 0.99$ \\
-qNEHVI & $\mathbf{18.44 \pm 0.29}$ & $\mathbf{29.11 \pm 0.52}$ & $\mathbf{45.20 \pm 0.81}$ \\
-Random & $16.88 \pm 0.55$ & $23.89 \pm 1.24$ & $35.61 \pm 2.19$ \\
+\textbf{qSTCH-Set} (ours) & $17.23 \pm 0.58$ & $26.91 \pm 0.94$ & $42.44 \pm 1.41$ \\
+qNParEGO & $17.38 \pm 0.44$ & $26.94 \pm 0.97$ & $41.18 \pm 1.61$ \\
+qEHVI & $18.19 \pm 0.35$ & $28.51 \pm 0.71$ & $44.93 \pm 1.02$ \\
+qNEHVI & $\mathbf{18.52 \pm 0.31}$ & $\mathbf{29.04 \pm 0.58}$ & $\mathbf{45.31 \pm 0.88}$ \\
+Random & $16.91 \pm 0.61$ & $23.74 \pm 1.31$ & $35.49 \pm 2.31$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -398,7 +398,7 @@ We discuss six limitations of qSTCH-Set in Appendix~\ref{app:limitations}, inclu
 
 We introduced qSTCH-Set, a Monte Carlo acquisition function that brings set-based smooth Tchebycheff scalarization from gradient-based many-objective optimization into the sample-efficient Bayesian optimization setting. By applying the STCH-Set smooth minimax formulation~\citep{lin2025few} to GP posterior samples, qSTCH-Set jointly optimizes $K$ candidates to cover $m$ objectives at $O(Km)$ per-evaluation cost, with surrogate-space Pareto optimality guarantees (Proposition~\ref{prop:pareto-transfer}(a)) and a smoothing gap bounded by $\mu\log(mK)$ (Proposition~\ref{prop:pareto-transfer}(b)).
 
-The central empirical finding is that setting $K{=}m$---the minimum batch size for full objective coverage---yields consistent improvements as $m$ grows, with larger $K$ providing further gains at higher cost. On DTLZ2, qSTCH-Set achieves hypervolume $46.95 \pm 1.31$ at $m{=}10$ vs.\ qNParEGO $44.10 \pm 0.99$ ($+6.5\%$); at $m{=}8$, setting $K{=}m{=}8$ closes the gap from $19.26$ (at $K{=}5$) to $20.22$ ($+5\%$); and a $K$-ablation at $m{=}5$ confirms that increasing $K$ improves both mean HV and reduces variance ($K{=}10$: $6.24 \pm 0.36$ vs.\ $K{=}3$: $5.76 \pm 0.61$). The advantage grows with $m$, precisely where random weight vectors concentrate in the simplex interior and fail to cover extremal trade-off directions.
+The central empirical finding is that setting $K{=}m$---the minimum batch size for full objective coverage---yields consistent improvements as $m$ grows, with larger $K$ providing further gains at higher cost. On DTLZ2, qSTCH-Set achieves hypervolume $49.12 \pm 3.21$ at $m{=}10$ vs.\ qNParEGO $44.89 \pm 1.14$ ($+9.4\%$); at $m{=}8$, setting $K{=}m{=}8$ closes the gap from $19.26$ (at $K{=}5$) to $20.22$ ($+5\%$); and a $K$-ablation at $m{=}5$ confirms that increasing $K$ improves both mean HV and reduces variance ($K{=}10$: $6.24 \pm 0.36$ vs.\ $K{=}3$: $5.76 \pm 0.61$). The advantage grows with $m$, precisely where random weight vectors concentrate in the simplex interior and fail to cover extremal trade-off directions.
 
 Several directions are ripe for future work. \emph{Proving $K > 1$ consistency} (Remark~\ref{conj:consistency}) is the primary theoretical challenge, likely requiring set-valued epi-convergence arguments. \emph{Adaptive $K$ scheduling}---starting with $K < m$ when the budget is tight and increasing $K$ as the GP sharpens---could make qSTCH-Set practical for $m = 50$+ objectives without $m$-fold cost from the first iteration. \emph{$\mu$-annealing} ($\mu_t = c / \log(t+1)$) is theoretically motivated by Corollary~\ref{cor:annealing} and could eliminate the smoothing residual without manual tuning. Finally, the motivating application---\emph{drug discovery} with $m = 20$--$50$ ADMET endpoints and $K = 3$--$5$ lead candidates---represents the ultimate test: a regime where qEHVI is intractable, random scalarization is inadequate, and coordinated set-based acquisition may provide the first viable path to many-objective sample-efficient optimization.
 
