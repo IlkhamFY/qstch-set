@@ -179,11 +179,17 @@ def optimize_qnehvi(problem, model, train_x, train_obj, sampler, bounds, batch_s
 
 
 def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype):
+    # Compute normalization from observed training data (BoTorch max convention)
+    Y_min = train_obj.min(dim=0).values
+    Y_max = train_obj.max(dim=0).values
+    Y_range = Y_max - Y_min
     acq = qSTCHSet(
         model=model,
         ref_point=ref_point,
         mu=0.1,
         sampler=sampler,
+        Y_range=Y_range,
+        Y_min=Y_min,
     )
     candidates, _ = optimize_acqf(
         acq_function=acq,

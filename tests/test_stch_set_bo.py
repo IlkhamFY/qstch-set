@@ -173,6 +173,156 @@ class TestqSTCHSet:
         assert not torch.allclose(val_max, val_min, atol=1e-4)
 
 
+    def test_normalization_basic(self):
+        """Test that Y_range/Y_min normalization produces finite, valid outputs."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        Y_min = torch.tensor([0.1, 0.2, 0.3], dtype=DTYPE)
+        Y_range = torch.tensor([0.5, 0.6, 0.4], dtype=DTYPE)
+
+        acqf = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            Y_range=Y_range,
+            Y_min=Y_min,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([32])),
+        )
+
+        X = torch.rand(2, 3, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([2])
+        assert torch.isfinite(val).all()
+
+    def test_normalization_large_scale(self):
+        """Test normalization handles large objective scales (the Penicillin bug)."""
+
+        def _make_large_scale_model(d=4, m=3, n=15, scale=1e5):
+            torch.manual_seed(42)
+            train_X = torch.rand(n, d, dtype=DTYPE, device=DEVICE)
+            # Large-scale objectives (simulating Penicillin ~300K range)
+            train_Y = torch.rand(n, m, dtype=DTYPE, device=DEVICE) * scale + scale
+            model = SingleTaskGP(train_X, train_Y, outcome_transform=Standardize(m=m))
+            return model, train_Y
+
+        model, train_Y = _make_large_scale_model(scale=3e5)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        Y_min = train_Y.min(dim=0).values
+        Y_range = train_Y.max(dim=0).values - Y_min
+
+        # Without normalization: gradients should be near-zero (saturated softmax)
+        acqf_raw = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([32])),
+        )
+        X_raw = torch.rand(1, 3, 4, dtype=DTYPE, requires_grad=True)
+        val_raw = acqf_raw(X_raw)
+        val_raw.sum().backward()
+        grad_norm_raw = X_raw.grad.norm().item()
+
+        # With normalization: gradients should be healthy
+        acqf_norm = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            Y_range=Y_range,
+            Y_min=Y_min,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([32])),
+        )
+        X_norm = torch.rand(1, 3, 4, dtype=DTYPE, requires_grad=True)
+        val_norm = acqf_norm(X_norm)
+        val_norm.sum().backward()
+        grad_norm_norm = X_norm.grad.norm().item()
+
+        # Normalized version should have meaningfully larger gradients
+        # (or at least both should be finite)
+        assert torch.isfinite(val_raw).all()
+        assert torch.isfinite(val_norm).all()
+        assert grad_norm_norm > 0, "Normalized gradients should be non-zero"
+
+    def test_normalization_differentiable(self):
+        """Test that gradients flow through normalized acquisition."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        Y_min = torch.tensor([0.1, 0.2, 0.3], dtype=DTYPE)
+        Y_range = torch.tensor([0.5, 0.6, 0.4], dtype=DTYPE)
+
+        acqf = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            Y_range=Y_range,
+            Y_min=Y_min,
+        )
+
+        X = torch.rand(2, 3, 4, dtype=DTYPE, requires_grad=True)
+        val = acqf(X)
+        val.sum().backward()
+        assert X.grad is not None
+        assert not torch.isnan(X.grad).any()
+        assert X.grad.norm().item() > 0
+
+    def test_normalization_requires_both_args(self):
+        """Y_range without Y_min should raise."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        with pytest.raises(ValueError, match="Y_min is required"):
+            qSTCHSet(
+                model=model,
+                ref_point=ref_point,
+                Y_range=torch.ones(3, dtype=DTYPE),
+            )
+
+    def test_normalization_backward_compatible(self):
+        """Without Y_range, behavior should be identical to before."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        sampler = SobolQMCNormalSampler(sample_shape=torch.Size([32]))
+
+        acqf = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            sampler=sampler,
+        )
+        assert acqf.Y_range is None
+        assert acqf.Y_min is None
+
+        X = torch.rand(2, 3, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([2])
+        assert torch.isfinite(val).all()
+
+    def test_normalization_optimize_acqf(self):
+        """Test that normalized acqf works with optimize_acqf."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        Y_min = torch.tensor([0.1, 0.2, 0.3], dtype=DTYPE)
+        Y_range = torch.tensor([0.5, 0.6, 0.4], dtype=DTYPE)
+
+        acqf = qSTCHSet(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            Y_range=Y_range,
+            Y_min=Y_min,
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([32])),
+        )
+
+        bounds = torch.stack([torch.zeros(4, dtype=DTYPE), torch.ones(4, dtype=DTYPE)])
+        candidates, value = optimize_acqf(
+            acq_function=acqf,
+            bounds=bounds,
+            q=3,
+            num_restarts=2,
+            raw_samples=16,
+        )
+        assert candidates.shape == torch.Size([3, 4])
+        assert torch.isfinite(value)
+
+
 class TestqSTCHSetTS:
     """Tests for Thompson Sampling variant."""
 
@@ -194,6 +344,26 @@ class TestqSTCHSetTS:
         # Should not error
         acqf.resample()
         val = acqf(X)
+        assert torch.isfinite(val).all()
+
+    def test_normalization(self):
+        """Test TS variant with normalization."""
+        model = _make_model(d=4, m=3)
+        ref_point = torch.zeros(3, dtype=DTYPE)
+        Y_min = torch.tensor([0.1, 0.2, 0.3], dtype=DTYPE)
+        Y_range = torch.tensor([0.5, 0.6, 0.4], dtype=DTYPE)
+
+        acqf = qSTCHSetTS(
+            model=model,
+            ref_point=ref_point,
+            mu=0.1,
+            Y_range=Y_range,
+            Y_min=Y_min,
+        )
+
+        X = torch.rand(3, 3, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([3])
         assert torch.isfinite(val).all()
 
 

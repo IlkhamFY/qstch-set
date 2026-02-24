@@ -48,10 +48,22 @@ class qSTCHSet(MCAcquisitionFunction):
     - Is fully differentiable (smooth log-sum-exp enables L-BFGS-B)
 
     The acquisition value for a set X_q = {x_1, ..., x_q} is:
-        α(X_q) = E_f~GP[ -STCH-Set(f(X_q)) ]
-    where STCH-Set = μ·log Σ_i exp(λ_i · (-μ·log Σ_k exp(-f_i(x_k)/μ) - z*_i) / μ)
+        alpha(X_q) = E_f~GP[ -STCH-Set(f(X_q)) ]
+    where STCH-Set = mu * log sum_i exp(lambda_i * (-mu * log sum_k exp(-f_i(x_k)/mu) - z*_i) / mu)
 
-    Higher α means the set better covers all objectives (minimax sense).
+    Higher alpha means the set better covers all objectives (minimax sense).
+
+    Objective normalization:
+        STCH-Set's logsumexp aggregation is sensitive to the scale of
+        objective values. When objectives have very different magnitudes
+        (e.g., VehicleSafety ~150 vs Penicillin ~300K), a fixed mu=0.1
+        causes the softmax to saturate, killing gradient flow.
+
+        To handle arbitrary objective scales, qSTCHSet normalizes posterior
+        samples to [0, 1] per objective using the observed training data
+        range (Y_range). Pass ``Y_range`` to enable this. When Y_range is
+        None (default), no normalization is applied -- appropriate when
+        objectives are already O(1) scale (e.g., DTLZ benchmarks).
 
     Args:
         model: A fitted multi-output BoTorch model.
@@ -63,9 +75,18 @@ class qSTCHSet(MCAcquisitionFunction):
             Positive weights required. Will be normalized to sum to 1.
         mu: Smoothing parameter for STCH-Set. Controls the approximation
             tightness to true Tchebycheff. Default 0.1.
-            - Smaller μ → tighter approximation, larger gradients
-            - Larger μ → smoother but less faithful
-            - Approximation gap ≤ μ·log(m) + μ·log(q)
+            - Smaller mu: tighter approximation, larger gradients
+            - Larger mu: smoother but less faithful
+            - Approximation gap <= mu * log(m) + mu * log(q)
+        Y_range: Per-objective range tensor of shape (m,) for normalization.
+            Computed as max(Y_obs, dim=0) - min(Y_obs, dim=0) over observed
+            training data. When provided, posterior samples and ref_point are
+            normalized to [0, 1] scale before scalarization, ensuring mu=0.1
+            works across arbitrary objective scales. Default: None (no
+            normalization, suitable for O(1)-scale objectives like DTLZ).
+        Y_min: Per-objective minimum tensor of shape (m,). Required when
+            Y_range is provided. The minimum observed value per objective,
+            used as the normalization offset: Y_norm = (Y - Y_min) / Y_range.
         sampler: MC sampler. Default: SobolQMCNormalSampler(256).
         X_pending: Pending points of shape (p, d) already selected.
         maximize: If True (default), assumes BoTorch maximization convention
@@ -76,12 +97,16 @@ class qSTCHSet(MCAcquisitionFunction):
         >>> from botorch.models import SingleTaskGP
         >>> from botorch.optim import optimize_acqf
         >>> model = SingleTaskGP(train_X, train_Y)  # train_Y: (n, m)
+        >>> # Compute normalization from training data
+        >>> Y_min = train_Y.min(dim=0).values
+        >>> Y_range = train_Y.max(dim=0).values - Y_min
         >>> acqf = qSTCHSet(
         ...     model=model,
-        ...     ref_point=torch.zeros(m),  # or best observed per objective
+        ...     ref_point=torch.zeros(m),
         ...     mu=0.1,
+        ...     Y_range=Y_range,
+        ...     Y_min=Y_min,
         ... )
-        >>> # Jointly optimize q=5 candidates
         >>> candidates, value = optimize_acqf(
         ...     acq_function=acqf,
         ...     bounds=bounds,
@@ -97,6 +122,8 @@ class qSTCHSet(MCAcquisitionFunction):
         ref_point: Tensor,
         weights: Optional[Tensor] = None,
         mu: float = 0.1,
+        Y_range: Optional[Tensor] = None,
+        Y_min: Optional[Tensor] = None,
         sampler: Optional[SobolQMCNormalSampler] = None,
         X_pending: Optional[Tensor] = None,
         maximize: bool = True,
@@ -120,8 +147,49 @@ class qSTCHSet(MCAcquisitionFunction):
         self.mu = mu
         self.maximize = maximize
 
+        # Objective normalization buffers
+        if Y_range is not None:
+            if Y_min is None:
+                raise ValueError("Y_min is required when Y_range is provided")
+            # Clamp range to avoid division by zero for constant objectives
+            Y_range = torch.clamp(Y_range, min=1e-8)
+            self.register_buffer("Y_range", Y_range)
+            self.register_buffer("Y_min", Y_min)
+        else:
+            self.Y_range = None
+            self.Y_min = None
+
         if X_pending is not None:
             self.set_X_pending(X_pending)
+
+    def _normalize(self, Y: Tensor, ref: Tensor) -> tuple:
+        """Normalize objectives to [0, 1] using observed data range.
+
+        Args:
+            Y: Objective values of shape (..., q, m) in minimization space.
+            ref: Reference point of shape (m,) in minimization space.
+
+        Returns:
+            (Y_norm, ref_norm) with objectives scaled to [0, 1].
+        """
+        if self.Y_range is None:
+            return Y, ref
+        # In minimization space: lower is better.
+        # Y_min and Y_range were computed from the BoTorch (maximization) space,
+        # so we need to account for the negation.
+        if self.maximize:
+            # Y is already negated (minimization). Y_min/Y_range are in max space.
+            # In max space: Y_max_obs is the best. After negation: -Y_max_obs is
+            # the min in min space. range stays the same (just sign-flipped).
+            # Normalize: Y_norm = (Y - min_minspace) / range
+            # min_minspace = -max_maxspace = -(Y_min + Y_range)
+            min_minspace = -(self.Y_min + self.Y_range)
+            Y_norm = (Y - min_minspace) / self.Y_range
+            ref_norm = (ref - min_minspace) / self.Y_range
+        else:
+            Y_norm = (Y - self.Y_min) / self.Y_range
+            ref_norm = (ref - self.Y_min) / self.Y_range
+        return Y_norm, ref_norm
 
     @concatenate_pending_points
     @t_batch_mode_transform()
@@ -150,9 +218,13 @@ class qSTCHSet(MCAcquisitionFunction):
             Y = samples
             ref = self.ref_point
 
+        # Normalize objectives to [0, 1] if Y_range is provided.
+        # This ensures mu=0.1 works regardless of objective scale.
+        Y, ref = self._normalize(Y, ref)
+
         # Apply STCH-Set scalarization
         # Y shape: (num_samples x batch_shape x q x m)
-        # smooth_chebyshev_set expects (..., q, m) → (...)
+        # smooth_chebyshev_set expects (..., q, m) -> (...)
         # Returns utility (higher = better set coverage)
         acq_values = smooth_chebyshev_set(
             Y=Y,
@@ -176,6 +248,8 @@ class qSTCHSetTS(MCAcquisitionFunction):
         ref_point: Reference point of shape (m,).
         weights: Preference weights of shape (m,). Default: uniform.
         mu: Smoothing parameter. Default 0.1.
+        Y_range: Per-objective range for normalization. See qSTCHSet.
+        Y_min: Per-objective minimum for normalization. See qSTCHSet.
         maximize: BoTorch maximization convention. Default True.
     """
 
@@ -185,6 +259,8 @@ class qSTCHSetTS(MCAcquisitionFunction):
         ref_point: Tensor,
         weights: Optional[Tensor] = None,
         mu: float = 0.1,
+        Y_range: Optional[Tensor] = None,
+        Y_min: Optional[Tensor] = None,
         maximize: bool = True,
     ) -> None:
         # Single sample = Thompson sampling
@@ -201,6 +277,30 @@ class qSTCHSetTS(MCAcquisitionFunction):
 
         self.mu = mu
         self.maximize = maximize
+
+        # Objective normalization buffers
+        if Y_range is not None:
+            if Y_min is None:
+                raise ValueError("Y_min is required when Y_range is provided")
+            Y_range = torch.clamp(Y_range, min=1e-8)
+            self.register_buffer("Y_range", Y_range)
+            self.register_buffer("Y_min", Y_min)
+        else:
+            self.Y_range = None
+            self.Y_min = None
+
+    def _normalize(self, Y: Tensor, ref: Tensor) -> tuple:
+        """Normalize objectives to [0, 1] using observed data range."""
+        if self.Y_range is None:
+            return Y, ref
+        if self.maximize:
+            min_minspace = -(self.Y_min + self.Y_range)
+            Y_norm = (Y - min_minspace) / self.Y_range
+            ref_norm = (ref - min_minspace) / self.Y_range
+        else:
+            Y_norm = (Y - self.Y_min) / self.Y_range
+            ref_norm = (ref - self.Y_min) / self.Y_range
+        return Y_norm, ref_norm
 
     def resample(self) -> None:
         """Draw a fresh Thompson sample on next forward() call."""
@@ -228,6 +328,8 @@ class qSTCHSetTS(MCAcquisitionFunction):
             Y = samples
             ref = self.ref_point
 
-        # (1, batch_shape, q, m) → apply STCH-Set → (1, batch_shape) → squeeze
+        Y, ref = self._normalize(Y, ref)
+
+        # (1, batch_shape, q, m) -> apply STCH-Set -> (1, batch_shape) -> squeeze
         acq_values = smooth_chebyshev_set(Y=Y, weights=self.weights, ref_point=ref, mu=self.mu)
         return acq_values.squeeze(0)  # (batch_shape,)
