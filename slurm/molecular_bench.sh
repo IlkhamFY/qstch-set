@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=mol-redox
-#SBATCH --account=rrg-ravh011_cpu
+#SBATCH --account=def-ravh011
 #SBATCH --time=06:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -21,7 +21,7 @@ mkdir -p $PROJECT/logs
 echo "Job $SLURM_JOB_ID starting on $(hostname) at $(date)"
 
 # Build fresh venv in local NVMe
-module load python/3.12
+module load python/3.12 rdkit/2024.09.6
 python -m venv --system-site-packages $SLURM_TMPDIR/mol-venv
 source $SLURM_TMPDIR/mol-venv/bin/activate
 
