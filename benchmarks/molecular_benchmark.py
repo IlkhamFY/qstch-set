@@ -58,6 +58,21 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 # ---------------------------------------------------------------------------
+# SELFIES-TED: suppress numpy version detection bug in transformers 5.x
+# Must happen before any transformers import
+# ---------------------------------------------------------------------------
+def _patch_importlib_metadata():
+    import importlib.metadata
+    _orig = importlib.metadata.version
+    def _patched(name):
+        if name == "numpy":
+            import numpy
+            return numpy.__version__
+        return _orig(name)
+    importlib.metadata.version = _patched
+
+
+# ---------------------------------------------------------------------------
 # Dataset loading
 # ---------------------------------------------------------------------------
 
@@ -107,6 +122,64 @@ def load_multi_redox(data_path: Path, device, dtype):
     )
     obj_names = ["neg_Ered", "HOMO", "neg_Gsol", "Absorption"]
     return X_pool, Y_pool, smiles_list, obj_names
+
+
+def load_selfies_ted_embeddings(data_path: Path, device, dtype):
+    """Load precomputed SELFIES-TED embeddings for BTZ dataset.
+
+    Precomputed by scripts/precompute_selfies_ted.py using IBM's
+    ibm/materials.selfies-ted BART-based model pretrained on 1B molecules.
+
+    Falls back to on-the-fly encoding if .pt file doesn't exist.
+
+    Returns:
+        X_pool: (N, 1024) embedding tensor
+    """
+    pt_path = data_path.parent / "redox_mer_selfies_ted.pt"
+
+    if pt_path.exists():
+        print(f"Loading precomputed SELFIES-TED embeddings from {pt_path}")
+        X = torch.load(pt_path, map_location=device).to(dtype)
+        print(f"  Loaded: {X.shape}")
+        return X
+    else:
+        print("Precomputed embeddings not found. Encoding on-the-fly (slow)...")
+        _patch_importlib_metadata()
+        import os
+        os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+        import selfies as sf
+        from transformers import AutoTokenizer, AutoModel
+
+        with open(data_path, "r") as f:
+            import csv
+            smiles_list = [r["SMILES"] for r in csv.DictReader(f)]
+
+        tokenizer = AutoTokenizer.from_pretrained("ibm/materials.selfies-ted")
+        model_st = AutoModel.from_pretrained("ibm/materials.selfies-ted")
+        model_st.eval()
+
+        embeddings = []
+        for i, smi in enumerate(smiles_list):
+            try:
+                sel = sf.encoder(smi).replace("][", "] [")
+                tok = tokenizer(sel, return_tensors="pt", max_length=128,
+                                truncation=True, padding="max_length")
+                with torch.no_grad():
+                    out = model_st.encoder(input_ids=tok["input_ids"],
+                                           attention_mask=tok["attention_mask"])
+                    h = out.last_hidden_state
+                    m = tok["attention_mask"].unsqueeze(-1).expand(h.size()).float()
+                    pooled = (h * m).sum(1) / m.sum(1).clamp(min=1e-9)
+                embeddings.append(pooled.squeeze(0))
+            except Exception as e:
+                embeddings.append(torch.zeros(1024))
+            if (i + 1) % 100 == 0:
+                print(f"  Encoded {i+1}/{len(smiles_list)}")
+
+        X = torch.stack(embeddings).to(device=device, dtype=dtype)
+        torch.save(X, pt_path)
+        print(f"Saved embeddings to {pt_path}")
+        return X
 
 
 def _compute_morgan_fps(smiles_list, radius=2, n_bits=1024):
@@ -370,6 +443,7 @@ def run_molecular_benchmark(
     dtype,
     fast_stch: bool = True,
     kernel: str = "rbf",
+    repr: str = "morgan",
 ):
     """Pool-based multi-objective BO following Kristiadi et al. Algorithm 1."""
 
@@ -377,7 +451,14 @@ def run_molecular_benchmark(
     data_dir = Path(__file__).parent.parent / "data"
     if dataset == "multi_redox":
         data_path = data_dir / "redox_mer.csv"
-        X_pool, Y_pool, smiles, obj_names = load_multi_redox(data_path, device, dtype)
+        X_pool_morgan, Y_pool, smiles, obj_names = load_multi_redox(data_path, device, dtype)
+
+        if repr == "selfies_ted":
+            X_pool = load_selfies_ted_embeddings(data_path, device, dtype)
+            repr_label = "SELFIES-TED (1024-dim)"
+        else:
+            X_pool = X_pool_morgan
+            repr_label = f"Morgan FP (radius=2, 1024-bit)"
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -399,7 +480,7 @@ def run_molecular_benchmark(
         ymin, ymax = Y_pool[:, i].min().item(), Y_pool[:, i].max().item()
         print(f"    {name}: [{ymin:.4f}, {ymax:.4f}]")
     print(f"  n_init: {n_init} | n_iters: {n_iters} | batch_size (K): {batch_size}")
-    print(f"  MC samples: {mc_samples} | Seeds: {n_seeds} | Kernel: {kernel}")
+    print(f"  MC samples: {mc_samples} | Seeds: {n_seeds} | Kernel: {kernel} | Repr: {repr_label}")
     print(f"  Oracle HV (full pool): {oracle_hv:.6e}")
     print(f"  Ref point: {[f'{x:.4f}' for x in ref_point.cpu().tolist()]}")
     print(f"{'='*70}")
@@ -496,6 +577,7 @@ def run_molecular_benchmark(
         "feature_dim": d,
         "num_objectives": num_obj,
         "objective_names": obj_names,
+        "repr": repr,
         "kernel": kernel,
         "n_init": n_init,
         "n_iters": n_iters,
@@ -576,6 +658,9 @@ if __name__ == "__main__":
     parser.add_argument("--kernel", type=str, default="rbf",
                         choices=["rbf", "tanimoto"],
                         help="GP kernel: rbf (default) or tanimoto")
+    parser.add_argument("--repr", type=str, default="morgan",
+                        choices=["morgan", "selfies_ted"],
+                        help="Molecular representation: morgan (default) or selfies_ted")
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -585,7 +670,7 @@ if __name__ == "__main__":
     device = torch.device(args.device)
 
     if args.output_dir is None:
-        out = Path(__file__).parent.parent / "results" / f"molecular_{args.dataset}_{args.kernel}"
+        out = Path(__file__).parent.parent / "results" / f"molecular_{args.dataset}_{args.repr}_{args.kernel}"
     else:
         out = Path(args.output_dir)
 
@@ -601,4 +686,5 @@ if __name__ == "__main__":
         dtype=dtype,
         fast_stch=args.fast_stch,
         kernel=args.kernel,
+        repr=args.repr,
     )
