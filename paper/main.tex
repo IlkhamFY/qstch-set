@@ -339,23 +339,23 @@ To validate qSTCH-Set beyond synthetic test functions, we evaluate on three engi
 
 \begin{table}[h]
 \centering
-\caption{Real-world benchmark results (HV $\uparrow$, 5 seeds, 20 iters, $K{=}m$). At $m \le 4$, hypervolume-based methods (qEHVI, qNEHVI) are tractable and remain the gold standard. qSTCH-Set is competitive with qNParEGO across all three problems.}
+\caption{Real-world benchmark results (HV $\uparrow$, 5 seeds, 20 iters, $K{=}m$). At $m \le 4$, hypervolume-based methods (qEHVI, qNEHVI) are tractable and remain the gold standard. qSTCH-Set trails qNParEGO at low $m$, consistent with the scalarization hierarchy discussed in text.}
 \label{tab:real-world}
 \small
 \begin{tabular}{lcccc}
 \toprule
 Method & VehicleSafety ($m{=}3$) & Penicillin ($m{=}3$) & CarSideImpact ($m{=}4$) \\
 \midrule
-\textbf{qSTCH-Set} (ours) & \placeholder{} & \placeholder{} & \placeholder{} \\
-qNParEGO & \placeholder{} & \placeholder{} & \placeholder{} \\
-qEHVI & \placeholder{} & \placeholder{} & \placeholder{} \\
-qNEHVI & \placeholder{} & \placeholder{} & \placeholder{} \\
-Random & \placeholder{} & \placeholder{} & \placeholder{} \\
+\textbf{qSTCH-Set} (ours) & $192.8 \pm 18.7$ & $280{,}043 \pm 24{,}680$ & \placeholder{pending} \\
+qNParEGO & $218.7 \pm 8.0$ & $\mathbf{362{,}750 \pm 17{,}271}$ & \placeholder{pending} \\
+qEHVI & $\mathbf{244.4 \pm 0.3}$ & $348{,}211 \pm 22{,}987$ & \placeholder{pending} \\
+qNEHVI & $244.5 \pm 0.4$ & $347{,}352 \pm 9{,}722$ & \placeholder{pending} \\
+Random & $164.8 \pm 5.4$ & $297{,}035 \pm 15{,}201$ & \placeholder{pending} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-As expected, qNEHVI and qEHVI dominate at $m \le 4$ where exact hypervolume partitioning is tractable.
+As expected, qNEHVI and qEHVI dominate at $m \le 4$ where exact hypervolume partitioning is tractable. On Penicillin, qNParEGO outperforms even the hypervolume-based methods, while qSTCH-Set trails---indicating that at low~$m$, the STCH-Set coordination overhead does not yet pay off.
 The structural reason is that hypervolume-based acquisitions are \emph{Pareto-aware}: qEHVI re-partitions the non-dominated space at each iteration and targets regions where new evaluations would add the most hypervolume, directly optimizing the quality metric of interest.
 In contrast, scalarization-based methods---including qSTCH-Set---optimize a \emph{proxy} objective (a weighted aggregation of the GP posteriors) that is Pareto-consistent in theory but does not explicitly reason about dominated vs.\ non-dominated partitioning.
 This gap is inherent: scalarization decomposes the multi-objective structure into scalar subproblems, while hypervolume methods preserve it.
