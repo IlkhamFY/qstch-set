@@ -1,14 +1,17 @@
 """
 Pool-based multi-objective molecular optimization benchmark.
 
-Follows Kristiadi et al. (ICML 2024) Algorithm 1: discrete BO over a fixed
-molecular pool, using Morgan fingerprints as features for a multi-output GP
-surrogate. Evaluates hypervolume improvement over BO iterations.
+Extends Kristiadi et al. (ICML 2024) single-objective setting to
+multi-objective: discrete BO over a fixed molecular pool, using Morgan
+fingerprints as features for a multi-output GP surrogate. Evaluates
+hypervolume improvement over BO iterations.
 
 Datasets:
-  - multi_redox: BTZ derivatives, 1407 molecules, 2 objectives
-      * Ered (reduction potential) -> minimize (negate for max convention)
-      * Gsol (solvation free energy) -> minimize (negate for max convention)
+  - multi_redox: BTZ derivatives, 1407 molecules, 4 objectives
+      * Ered (reduction potential)     -> minimize (negate for max convention)
+      * HOMO (HOMO energy level)       -> maximize (already max convention)
+      * Gsol (solvation free energy)   -> minimize (negate for max convention)
+      * Absorption Wavelength (nm)     -> maximize (already max convention)
 
 Methods compared:
   - Random: uniform random selection from pool
@@ -18,6 +21,10 @@ Methods compared:
 Key difference from continuous BO: acquisition is maximized over a discrete
 candidate pool (not via L-BFGS-B). Each iteration picks the top-K molecules
 from the remaining pool by acquisition value.
+
+Note: Kristiadi et al. only optimize Ered (single-objective). We extend to
+all 4 DFT properties simultaneously, creating a many-objective molecular
+optimization benchmark that tests STCH-Set in its intended regime (m >= 4).
 """
 import argparse
 import json
@@ -54,18 +61,21 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 # ---------------------------------------------------------------------------
 
 def load_multi_redox(data_path: Path, device, dtype):
-    """Load multi-redox BTZ dataset.
+    """Load multi-redox BTZ dataset with 4 objectives.
 
-    Objectives (Kristiadi et al.):
+    Objectives (all converted to maximization for BoTorch):
       - Ered: reduction potential (minimize -> negate)
+      - HOMO: HOMO energy level (maximize -> keep as-is)
       - Gsol: solvation free energy (minimize -> negate)
+      - Absorption Wavelength: nm (maximize -> keep as-is)
 
     Features: Morgan fingerprints (radius=2, 1024 bits).
 
     Returns:
-        X_pool: (N, d_fp) fingerprint tensor
-        Y_pool: (N, 2) objective tensor (negated for maximization)
+        X_pool: (N, 1024) fingerprint tensor
+        Y_pool: (N, 4) objective tensor (all maximization convention)
         smiles: list of SMILES strings
+        obj_names: list of objective names
     """
     import csv
 
@@ -77,18 +87,25 @@ def load_multi_redox(data_path: Path, device, dtype):
 
     smiles_list = [r["SMILES"] for r in rows]
     ered = np.array([float(r["Ered"]) for r in rows])
+    homo = np.array([float(r["HOMO"]) for r in rows])
     gsol = np.array([float(r["Gsol"]) for r in rows])
+    absorp = np.array([float(r["Absorption Wavelength"]) for r in rows])
 
     # Compute Morgan fingerprints
     fps = _compute_morgan_fps(smiles_list, radius=2, n_bits=1024)
 
     X_pool = torch.tensor(fps, device=device, dtype=dtype)
-    # Negate for maximization convention (BoTorch standard)
+    # Convert to maximization convention (BoTorch standard)
+    # Ered: minimize -> negate
+    # HOMO: maximize -> keep (higher HOMO = better electron donor)
+    # Gsol: minimize -> negate (more negative = better solvation)
+    # Absorption: maximize -> keep (red-shifted = desirable)
     Y_pool = torch.tensor(
-        np.stack([-ered, -gsol], axis=1),
+        np.stack([-ered, homo, -gsol, absorp], axis=1),
         device=device, dtype=dtype,
     )
-    return X_pool, Y_pool, smiles_list
+    obj_names = ["neg_Ered", "HOMO", "neg_Gsol", "Absorption"]
+    return X_pool, Y_pool, smiles_list, obj_names
 
 
 def _compute_morgan_fps(smiles_list, radius=2, n_bits=1024):
@@ -343,7 +360,7 @@ def run_molecular_benchmark(
     data_dir = Path(__file__).parent.parent / "data"
     if dataset == "multi_redox":
         data_path = data_dir / "redox_mer.csv"
-        X_pool, Y_pool, smiles = load_multi_redox(data_path, device, dtype)
+        X_pool, Y_pool, smiles, obj_names = load_multi_redox(data_path, device, dtype)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -360,10 +377,14 @@ def run_molecular_benchmark(
     print(f"\n{'='*70}")
     print(f"Molecular Benchmark: {dataset}")
     print(f"  Pool size: {N} | Features: {d} | Objectives: {num_obj}")
+    print(f"  Objectives: {obj_names}")
+    for i, name in enumerate(obj_names):
+        ymin, ymax = Y_pool[:, i].min().item(), Y_pool[:, i].max().item()
+        print(f"    {name}: [{ymin:.4f}, {ymax:.4f}]")
     print(f"  n_init: {n_init} | n_iters: {n_iters} | batch_size (K): {batch_size}")
     print(f"  MC samples: {mc_samples} | Seeds: {n_seeds}")
-    print(f"  Oracle HV (full pool): {oracle_hv:.4f}")
-    print(f"  Ref point: {ref_point.cpu().tolist()}")
+    print(f"  Oracle HV (full pool): {oracle_hv:.6e}")
+    print(f"  Ref point: {[f'{x:.4f}' for x in ref_point.cpu().tolist()]}")
     print(f"{'='*70}")
 
     methods = ["random", "qnparego", "qstch_set"]
@@ -478,12 +499,12 @@ def run_molecular_benchmark(
         }
 
     print(f"\n{'='*70}")
-    print(f"Final HV ({dataset}) after {n_iters} iterations:")
+    print(f"Final HV ({dataset}, m={num_obj}) after {n_iters} iterations:")
     for method in methods:
         r = summary[method]
         pct = r["final_hv_mean"] / oracle_hv * 100
-        print(f"  {labels[method]:15s}: {r['final_hv_mean']:.4f} +/- {r['final_hv_std']:.4f} ({pct:.1f}% of oracle)")
-    print(f"  Oracle (full pool): {oracle_hv:.4f}")
+        print(f"  {labels[method]:15s}: {r['final_hv_mean']:.6e} +/- {r['final_hv_std']:.6e} ({pct:.1f}% of oracle)")
+    print(f"  Oracle (full pool): {oracle_hv:.6e}")
     print(f"{'='*70}")
 
     with open(output_dir / "summary.json", "w") as f:
@@ -508,7 +529,7 @@ def run_molecular_benchmark(
         ax.axhline(oracle_hv, color="black", linestyle="--", linewidth=1, alpha=0.5, label="Oracle")
         ax.set_xlabel("BO Iteration (each selects K molecules)")
         ax.set_ylabel("Hypervolume")
-        ax.set_title(f"Molecular Optimization: {dataset}\n"
+        ax.set_title(f"Molecular Optimization: {dataset} (m={num_obj})\n"
                      f"(pool={N}, K={batch_size}, {n_seeds} seeds, {n_init} init)")
         ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3)
@@ -527,8 +548,8 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, default=5, help="Number of random seeds")
     parser.add_argument("--n-init", type=int, default=20, help="Initial random observations")
     parser.add_argument("--n-iters", type=int, default=30, help="Number of BO iterations")
-    parser.add_argument("--batch-size", type=int, default=2,
-                        help="Candidates per iteration (K). Default=2 (num_objectives)")
+    parser.add_argument("--batch-size", type=int, default=4,
+                        help="Candidates per iteration (K). Default=4 (num_objectives)")
     parser.add_argument("--mc-samples", type=int, default=64, help="MC samples for acquisition")
     parser.add_argument("--fast-stch", action="store_true", default=True,
                         help="Use fast greedy STCH-Set selection (default)")
