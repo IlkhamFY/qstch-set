@@ -119,6 +119,8 @@ Bayesian optimization (expensive $f$) & Pires \& Coelho~\citep{pires2025stch} & 
 \end{table}
 
 We fill this gap with \textbf{qSTCH-Set}, a Monte Carlo acquisition function that evaluates a candidate set by applying the STCH-Set minimax scalarization to GP posterior samples, enabling coordinated multi-solution acquisition for many-objective BO.
+Unlike hypervolume-based methods (qEHVI, qNEHVI), which directly optimize Pareto front volume but at exponential cost in~$m$, qSTCH-Set optimizes a scalarized proxy at polynomial cost $O(Km)$---sacrificing Pareto-awareness for scalability.
+This yields a natural hierarchy: hypervolume methods are optimal when tractable ($m \le 4$); qSTCH-Set provides coordinated batch acquisition when they are not ($m \ge 5$); uncoordinated scalarization (qNParEGO) is the lightweight fallback.
 Our practical recommendation sets $K{=}m$ as the minimum batch size for full coverage: one candidate per objective, so that the smooth minimum operator can assign each candidate to a distinct objective direction, expanding the Pareto front along all axes simultaneously.
 
 \paragraph{Contributions.}
@@ -353,7 +355,13 @@ Random & \placeholder{} & \placeholder{} & \placeholder{} \\
 \end{tabular}
 \end{table}
 
-As expected, qNEHVI and qEHVI dominate at $m \le 4$ where exact hypervolume partitioning is tractable. qSTCH-Set is competitive with qNParEGO on all three problems and substantially outperforms random search. The key point is complementarity: qSTCH-Set is designed for the many-objective regime ($m \ge 5$) where qEHVI/qNEHVI become computationally intractable, not to replace them where they work well.
+As expected, qNEHVI and qEHVI dominate at $m \le 4$ where exact hypervolume partitioning is tractable.
+The structural reason is that hypervolume-based acquisitions are \emph{Pareto-aware}: qEHVI re-partitions the non-dominated space at each iteration and targets regions where new evaluations would add the most hypervolume, directly optimizing the quality metric of interest.
+In contrast, scalarization-based methods---including qSTCH-Set---optimize a \emph{proxy} objective (a weighted aggregation of the GP posteriors) that is Pareto-consistent in theory but does not explicitly reason about dominated vs.\ non-dominated partitioning.
+This gap is inherent: scalarization decomposes the multi-objective structure into scalar subproblems, while hypervolume methods preserve it.
+
+The practical consequence is a natural hierarchy among MOBO methods: (1)~hypervolume-based methods (qEHVI, qNEHVI) are optimal when tractable ($m \le 4$); (2)~coordinated scalarization (qSTCH-Set) fills the gap when hypervolume computation is intractable ($m \ge 5$); (3)~uncoordinated scalarization (qNParEGO) serves as a lightweight baseline.
+qSTCH-Set is designed for regime~(2), not to replace qEHVI/qNEHVI in regime~(1).
 
 \subsection{Benchmark Scope and Future Experiments}
 \label{sec:dtlz7-wfg4}
@@ -370,17 +378,19 @@ On ZDT2 ($m=2$), STCH-NParEGO achieves HV $107.2 \pm 4.1$, slightly outperformin
 %=============================================================================
 
 \paragraph{Hypervolume-based and information-theoretic MOBO.}
-qEHVI and qNEHVI~\citep{daulton2020qnehvi,daulton2021qnehvi} are the gold standard for $m \le 4$ objectives but require \#P-hard hypervolume partitioning~\citep{wang2024pohvi}, becoming intractable for $m > 5$.
+qEHVI and qNEHVI~\citep{daulton2020qnehvi,daulton2021qnehvi} are the gold standard for $m \le 4$ objectives: they directly optimize expected hypervolume improvement by re-partitioning the non-dominated space at each iteration, targeting regions where new evaluations add the most volume to the Pareto front.
+This \emph{Pareto-aware} approach is fundamentally stronger than scalarization proxies when tractable, but requires \#P-hard hypervolume partitioning~\citep{wang2024pohvi}, becoming intractable for $m > 5$.
 Recent $\varepsilon$-PoHVI~\citep{wang2024pohvi} extends exact integration but remains limited to small~$m$.
 Information-theoretic methods (MESMO~\citep{belakaria2019mesmo}, PFES~\citep{suzuki2020pfes}, JES~\citep{tu2022jes}) approximate entropy-based acquisitions but degrade similarly as Pareto front sampling costs grow with~$m$.
 MORBO~\citep{daulton2022morbo} targets high-dimensional \emph{input} spaces, not many objectives.
 
 \paragraph{Scalarization-based MOBO and smooth Tchebycheff.}
-ParEGO~\citep{knowles2006parego} and qNParEGO~\citep{daulton2020qnehvi} use random Chebyshev weight vectors; for $m \gg 5$, these concentrate in the simplex interior and fail to cover extremal Pareto directions.
+Scalarization methods trade Pareto-awareness for scalability: instead of partitioning the non-dominated space (which is intractable for large~$m$), they decompose the multi-objective problem into scalar subproblems.
+ParEGO~\citep{knowles2006parego} and qNParEGO~\citep{daulton2020qnehvi} use random Chebyshev weight vectors, treating each batch element as an independent scalarized problem with no coordination; for $m \gg 5$, the random weights concentrate in the simplex interior and fail to cover extremal Pareto directions.
 Lin et al.~\citep{lin2024smooth,lin2025few} introduced STCH and STCH-Set---log-sum-exp relaxations that are $C^\infty$, preserve Pareto optimality, and scale to $m{=}1{,}024$ in gradient-based optimization, but require cheap differentiable objectives.
 Pires \& Coelho~\citep{pires2025stch} brought single-point STCH into the BO loop~\citep{astudillo2019composite} without set-based coordination.
 Evolutionary methods (NSGA-III~\citep{deb2014nsga3}, MOEA/D~\citep{zhang2007moead}) handle many objectives but need thousands of evaluations, ruling them out for expensive black-box problems.
-\textbf{qSTCH-Set} fills the remaining gap: set-based smooth Tchebycheff coordination within a sample-efficient BO loop.
+\textbf{qSTCH-Set} fills the remaining gap: set-based smooth Tchebycheff coordination within a sample-efficient BO loop, providing the best available proxy for Pareto front coverage in the many-objective regime where direct hypervolume optimization is intractable.
 
 \paragraph{Two-stage generative MOBO.}
 Sorourifar et al.~\citep{paulson2025qpmhi} propose a ``generate-then-optimize'' framework for \emph{discrete} molecular design: a generative model proposes candidates; qPMHI ranks them by probability of maximum hypervolume improvement.
