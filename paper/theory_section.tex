@@ -142,7 +142,7 @@ Three ingredients support a formal consistency argument---that every $\mathbf{x}
 \begin{enumerate}
     \item \textbf{GP posterior concentration}~\cite{srinivas2010ucb}: with high probability, $|f_i(\mathbf{x})-\mu_i^{(t)}(\mathbf{x})|\le\beta_t^{1/2}\sigma_i^{(t)}(\mathbf{x})\to 0$ as the model concentrates.
     \item \textbf{Lipschitz stability} of STCH-Set in the objective values transfers posterior errors to scalarization errors at rate $O(\beta_t^{1/2}\bar{\sigma}_t)$.
-    \item For $K{=}1$, consistency is proved by the composite BO result of \cite{astudillo2019composite}. For $K{>}1$, the set-valued optimization introduces permutation symmetries requiring set-valued epi-convergence arguments (Rockafellar \& Wets, Ch.~7) that remain open.
+    \item For $K{=}1$, consistency follows from the composite BO result of \cite{astudillo2019composite} and the sublinear regret bound for random scalarization BO~\cite{paria2019mobo}. For $K{>}1$, the set-valued optimization introduces permutation symmetries requiring set-valued epi-convergence arguments (Rockafellar \& Wets, Ch.~7) that remain open.
 \end{enumerate}
 We leave the formal proof for $K > 1$ as future work.
 \end{remark}

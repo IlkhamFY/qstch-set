@@ -94,7 +94,7 @@ Recent work has explored LLM and chemistry foundation model priors to improve si
 
 However, existing MOBO methods face a fundamental scaling barrier in the number of objectives~$m$.
 Hypervolume-based acquisition functions---the gold standard for $m \le 4$---rely on non-dominated partitioning of the objective space, which is \#P-hard in~$m$~\citep{daulton2020qnehvi,daulton2021qnehvi,wang2024pohvi}.
-Scalarization methods such as ParEGO and qNParEGO~\citep{knowles2006parego,daulton2020qnehvi} decompose the problem via random Chebyshev weight vectors, scaling gracefully in~$m$ but producing uncoordinated solutions: each batch element optimizes an independently sampled weight with no mechanism to ensure collective Pareto front coverage.
+Scalarization methods such as ParEGO and qNParEGO~\citep{knowles2006parego,paria2019mobo,daulton2020qnehvi} decompose the problem via random Chebyshev weight vectors, scaling gracefully in~$m$ but producing uncoordinated solutions: each batch element optimizes an independently sampled weight with no mechanism to ensure collective Pareto front coverage.
 Information-theoretic approaches (MESMO, PFES, JES)~\citep{belakaria2019mesmo,suzuki2020pfes,tu2022jes} face similar degradation as Pareto front sampling costs grow with~$m$.
 
 Two recent lines of work have made partial progress toward scalable many-objective scalarization.
@@ -386,7 +386,8 @@ MORBO~\citep{daulton2022morbo} targets high-dimensional \emph{input} spaces, not
 
 \paragraph{Scalarization-based MOBO and smooth Tchebycheff.}
 Scalarization methods trade Pareto-awareness for scalability: instead of partitioning the non-dominated space (which is intractable for large~$m$), they decompose the multi-objective problem into scalar subproblems.
-ParEGO~\citep{knowles2006parego} and qNParEGO~\citep{daulton2020qnehvi} use random Chebyshev weight vectors, treating each batch element as an independent scalarized problem with no coordination; for $m \gg 5$, the random weights concentrate in the simplex interior and fail to cover extremal Pareto directions.
+Paria et al.~\citep{paria2019mobo} provide the theoretical foundation for random scalarization BO, proving sublinear regret for GP-UCB with randomly sampled scalarization functions and generalizing ParEGO's~\citep{knowles2006parego} heuristic to a principled framework.
+qNParEGO~\citep{daulton2020qnehvi} implements this approach in BoTorch with random Chebyshev weights, but treats each batch element as an independent scalarized problem with no coordination; for $m \gg 5$, the random weights concentrate in the simplex interior and fail to cover extremal Pareto directions.
 Lin et al.~\citep{lin2024smooth,lin2025few} introduced STCH and STCH-Set---log-sum-exp relaxations that are $C^\infty$, preserve Pareto optimality, and scale to $m{=}1{,}024$ in gradient-based optimization, but require cheap differentiable objectives.
 Pires \& Coelho~\citep{pires2025stch} brought single-point STCH into the BO loop~\citep{astudillo2019composite} without set-based coordination.
 Evolutionary methods (NSGA-III~\citep{deb2014nsga3}, MOEA/D~\citep{zhang2007moead}) handle many objectives but need thousands of evaluations, ruling them out for expensive black-box problems.
