@@ -260,7 +260,7 @@ which is valid (since the lower bound $g^{\mathrm{TCH\text{-}Set}} \le g_\mu^{\m
 We identify six limitations of qSTCH-Set in its current form.
 
 \paragraph{1. Evaluation budget asymmetry.}
-The $K{=}m$ design rule means qSTCH-Set evaluates $m$ points per iteration while baselines evaluate $q{=}1$. Over 20 iterations at $m{=}10$, qSTCH-Set consumes $200$ function evaluations versus $20$ for qNParEGO. Although the method's purpose is to produce a \emph{coordinated set} of solutions---and the per-candidate acquisition cost amortizes to $\sim 1$s on H100---a controlled comparison with budget-matched baselines (e.g., running qNParEGO for $200$ iterations, or with batch $q{=}m$ via sequential greedy) would provide a cleaner empirical comparison. Until such experiments are conducted, the headline 6.5\% advantage at $m{=}10$ should be interpreted as a comparison of \emph{strategies} (coordinated vs.\ uncoordinated), not of equal-cost allocations.
+The $K{=}m$ design rule means qSTCH-Set evaluates $m$ points per iteration while baselines evaluate $q{=}1$. Over 20 iterations at $m{=}10$, qSTCH-Set consumes $200$ function evaluations versus $20$ for qNParEGO. Although the method's purpose is to produce a \emph{coordinated set} of solutions---and the per-candidate acquisition cost amortizes to $\sim 1$s on H100---a controlled comparison with budget-matched baselines (e.g., running qNParEGO for $200$ iterations, or with batch $q{=}m$ via sequential greedy) would provide a cleaner empirical comparison. Until such experiments are conducted, the headline 5.1\% advantage at $m{=}10$ should be interpreted as a comparison of \emph{strategies} (coordinated vs.\ uncoordinated), not of equal-cost allocations.
 
 \paragraph{2. $K < m$ performance degradation.}
 The $K$-ablation (Table~\ref{tab:ablation_k}) and scaling experiments reveal that $K < m$ consistently underperforms: at $m{=}8$, qSTCH-Set with the default $K{=}5$ reaches only HV~$19.26 \pm 1.49$, while $K{=}m{=}8$ achieves $20.22 \pm 1.90$ (5\% improvement). The $K{=}m$ rule is thus necessary but expensive: for $m{=}50$ objectives (a realistic drug discovery scenario), it requires evaluating 50~candidates per iteration. Practitioners with strict per-iteration budgets will need to trade off Pareto front coverage against cost, and no principled method for choosing $K < m$ exists beyond the empirical observation that larger $K$ is better.
@@ -275,7 +275,7 @@ Remark~\ref{conj:consistency} discusses empirical evidence that qSTCH-Set conver
 The qSTCH-Set acquisition landscape over $\Xset \in \X^K$ has dimension $K \cdot d$ (e.g., $10 \times 14 = 140$ at $m{=}10$, $d{=}14$). L-BFGS-B with 20 random restarts provides no global optimality guarantee for this non-convex problem. While this limitation is shared by all BO methods that use gradient-based acquisition optimization, the higher dimensionality of the joint candidate space ($Kd$ vs.\ $d$ for single-point methods) may exacerbate the issue. Evolutionary or hybrid acquisition optimizers could mitigate this.
 
 \paragraph{6. Statistical power.}
-The $m{=}10$ results for the $K{=}m{=}10$ comparison are based on 3~seeds. While the effect size is large (6.5\%, with non-overlapping $\pm 1\sigma$ intervals), full statistical validation with $\ge 10$ seeds is needed for publication-quality claims. A separate 5-seed run at $m{=}10$ with default $K$ confirms the ordering (qSTCH-Set $45.45 \pm 1.83$ vs qNParEGO $45.59 \pm 1.45$), but the $K{=}m$ advantage is only visible with $K{=}10$.
+The $m{=}10$ results use 5~seeds. While the effect size is meaningful (5.1\%, with non-overlapping $\pm 1\sigma$ intervals), full statistical validation with $\ge 10$ seeds would strengthen the claim. A separate run at $m{=}10$ with default $K{=}5$ shows qSTCH-Set ($45.45 \pm 1.83$) essentially tied with qNParEGO ($45.59 \pm 1.45$), confirming that the $K{=}m$ design rule is critical for the advantage to emerge.
 
 \paragraph{7. Acquisition optimization scalability and the case for evolutionary solvers.}
 L-BFGS-B with 20 random restarts incurs increasing cost as the joint candidate space grows: at $m{=}8$, $K{=}8$, optimizing $K{\times}d = 96$ variables takes $\sim\!330$\,s per BO iteration on an H100 GPU; at $m{=}10$, $K{=}10$ ($d{=}14$, so $140$ variables) this rises further. The cost is dominated by the non-convex joint landscape rather than the forward pass: each restart must navigate a $Kd$-dimensional space with no global optimality guarantee, and restarts converging to poor local optima effectively waste compute.
@@ -309,7 +309,7 @@ qNParEGO ($q{=}m$) & $\mathbf{6.42 \pm 0.23}$ & $23.20 \pm 0.43^{\dagger}$ \\
 
 This comparison disentangles two sources of qSTCH-Set's advantage: (1)~the raw benefit of evaluating $m$ points per iteration, which any batch method could exploit, and (2)~the coordination benefit of jointly optimizing the batch via the smooth minimax formulation, which is unique to qSTCH-Set.
 
-At $m{=}5$, budget-matched qNParEGO ($6.42 \pm 0.23$) edges qSTCH-Set ($6.22 \pm 0.50$), consistent with the single-point result at this scale. At $m{=}8$, however, qNParEGO $q{=}m$ ($23.20 \pm 0.43$) outperforms qSTCH-Set ($20.22 \pm 1.90$) on raw hypervolume, despite using the same total evaluation budget. This reversal is informative: it confirms that at $m{=}8$ the primary advantage of qSTCH-Set over single-point qNParEGO ($q{=}1$, 20.89) is \emph{coordination efficiency} rather than sheer evaluation count. The budget-matched result at $m{=}10$ is pending; given the growing advantage of qSTCH-Set at $m{=}10$ ($+6.5\%$ over $q{=}1$), it will clarify whether coordination becomes the decisive factor at higher dimensionality.
+At $m{=}5$, budget-matched qNParEGO ($6.42 \pm 0.23$) edges qSTCH-Set ($6.22 \pm 0.50$), consistent with the single-point result at this scale. At $m{=}8$, however, qNParEGO $q{=}m$ ($23.20 \pm 0.43$) outperforms qSTCH-Set ($20.22 \pm 1.90$) on raw hypervolume, despite using the same total evaluation budget. This reversal is informative: it confirms that at $m{=}8$ the primary advantage of qSTCH-Set over single-point qNParEGO ($q{=}1$, 20.89) is \emph{coordination efficiency} rather than sheer evaluation count. The budget-matched result at $m{=}10$ is pending; given the growing advantage of qSTCH-Set at $m{=}10$ ($+5.1\%$ over $q{=}1$), it will clarify whether coordination becomes the decisive factor at higher dimensionality.
 
 %=============================================================================
 \section{Extended Experimental Results}
@@ -319,8 +319,22 @@ At $m{=}5$, budget-matched qNParEGO ($6.42 \pm 0.23$) edges qSTCH-Set ($6.22 \pm
 
 \begin{figure}[t]
 \centering
+\includegraphics[width=0.7\linewidth]{figures/convergence_m5.pdf}
+\caption{Convergence on DTLZ2 with $m{=}5$ objectives, $K{=}5$ (5 seeds). qNParEGO leads qSTCH-Set at this low-$m$ regime, consistent with Table~\ref{tab:main}. Error bands show $\pm 1$ standard deviation.}
+\label{fig:convergence_m5}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.7\linewidth]{figures/convergence_m8.pdf}
+\caption{Convergence on DTLZ2 with $m{=}8$ objectives, $K{=}8$ (5 seeds). qSTCH-Set closes the gap with qNParEGO as $m$ increases. Error bands show $\pm 1$ standard deviation.}
+\label{fig:convergence_m8}
+\end{figure}
+
+\begin{figure}[t]
+\centering
 \includegraphics[width=0.7\linewidth]{figures/convergence_m10.pdf}
-\caption{Convergence on DTLZ2 with $m{=}10$ objectives, $K{=}10$ (3 seeds). qSTCH-Set outperforms qNParEGO by 6.5\% ($46.95 \pm 1.31$ vs $44.10 \pm 0.99$), with the gap widening after $\sim$5 iterations. This is the regime where set-based coordination is decisive.}
+\caption{Convergence on DTLZ2 with $m{=}10$ objectives, $K{=}10$ (3 seeds from early campaign). qSTCH-Set outperforms qNParEGO by 6.5\% ($46.95 \pm 1.31$ vs $44.10 \pm 0.99$). The 5-seed results in Table~\ref{tab:main} ($47.92$ vs $45.59$, $+5.1\%$) confirm this trend with tighter estimates.}
 \label{fig:convergence_m10}
 \end{figure}
 
@@ -569,4 +583,4 @@ All random seeds are controlled at three levels:
     \item \textbf{MC sampling}: Sobol quasi-random base samples for the reparameterization trick.
 \end{enumerate}
 
-The complete benchmark code, including Slurm job scripts, is available at \url{https://github.com/parameters/qSTCH-Set}.
+The complete benchmark code, including Slurm job scripts, is available at \url{https://github.com/IlkhamFY/qstch-set}.

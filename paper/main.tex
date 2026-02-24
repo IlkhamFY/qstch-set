@@ -1,8 +1,8 @@
 \documentclass{article}
 
 % NeurIPS 2026 style
-% NOTE: Switch to [final] after acceptance. Use default (anonymous) for submission.
-\usepackage[preprint]{neurips_2026}
+% NOTE: Switch to [final] after acceptance. Use [preprint] for arXiv. Use default (anonymous) for submission.
+\usepackage{neurips_2026}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -49,6 +49,8 @@
 
 \title{Set-Based Smooth Tchebycheff Scalarization\\for Many-Objective Bayesian Optimization}
 
+% NOTE: For anonymous NeurIPS submission, comment out author block below.
+% The neurips_2026 package (without options) auto-hides authors.
 \author{
   Ilkham Yabbarov \\
   Department of Chemistry \\
@@ -123,7 +125,7 @@ Our practical recommendation sets $K{=}m$ as the minimum batch size for full cov
 \begin{enumerate}
     \item We propose \textbf{qSTCH-Set}, the first Monte Carlo acquisition function that applies set-based smooth Tchebycheff scalarization to GP posterior samples for many-objective Bayesian optimization (\S\ref{sec:method}).
     \item We prove that STCH-Set Pareto optimality guarantees transfer to the GP posterior with a smoothing gap bounded by $\mu\log(mK)$ (Proposition~\ref{prop:pareto-transfer}), and discuss consistency under GP posterior convergence, with a formal proof for $K > 1$ left as future work (\S\ref{sec:theory}).
-    \item On DTLZ2, qSTCH-Set with $K{=}m$ outperforms qNParEGO ($q{=}1$) by 6.5\% at $m{=}10$ and closes a 5\% gap at $m{=}8$ (from $K{=}5$ to $K{=}m{=}8$), with the advantage growing as objective dimensionality increases; budget-matched comparisons are in Appendix~\ref{app:budget-matched} (\S\ref{sec:experiments}).
+    \item On DTLZ2, qSTCH-Set with $K{=}m$ outperforms qNParEGO ($q{=}1$) by 5.1\% at $m{=}10$ and closes a 5\% gap at $m{=}8$ (from $K{=}5$ to $K{=}m{=}8$), with the advantage growing as objective dimensionality increases; budget-matched comparisons are in Appendix~\ref{app:budget-matched} (\S\ref{sec:experiments}).
     \item We release an open-source BoTorch implementation as a drop-in \texttt{MCAcquisitionFunction} (\S\ref{app:implementation-full}).
 \end{enumerate}
 
@@ -232,7 +234,7 @@ Algorithm~\ref{alg:main} summarizes the full qSTCH-Set BO loop.
 \label{sec:experiments}
 %=============================================================================
 
-We evaluate qSTCH-Set on the DTLZ2~\citep{dtlz2005} and ZDT2~\citep{zdt2000} multi-objective benchmarks to demonstrate its scalability and effectiveness in many-objective regimes ($m \ge 5$) where traditional hypervolume-based methods are computationally intractable. Our implementation is built on BoTorch~\citep{balandat2020botorch} and is available at \url{https://github.com/parameters/qSTCH-Set}.\footnote{URL will be anonymized for review.}
+We evaluate qSTCH-Set on the DTLZ2~\citep{dtlz2005} and ZDT2~\citep{zdt2000} multi-objective benchmarks to demonstrate its scalability and effectiveness in many-objective regimes ($m \ge 5$) where traditional hypervolume-based methods are computationally intractable. Our implementation is built on BoTorch~\citep{balandat2020botorch} and is available at \url{https://github.com/IlkhamFY/qstch-set}.\footnote{Repository will be anonymized for review submission.}
 
 \subsection{Experimental Setup}
 
@@ -287,15 +289,15 @@ Random & $5.37 \pm 0.14$ & $17.63 \pm 0.29^{\ddagger}$ & $40.44 \pm 0.33^{\ddagg
 \vspace{2pt}
 {\footnotesize All results: Nibi H100 cluster, 20 BO iterations, $\mu{=}0.1$, Mat\'ern-5/2, 5 seeds (except where noted).\\
 $*$ STCH-NParEGO not run at $m{=}5$ in this campaign.\\
-$\dagger$ qNParEGO $m{=}8$: 3/5 seeds complete; final 2 seeds running on Nibi.\\
-$\ddagger$ From the $K{=}5$ default campaign (5 seeds); dedicated $K{=}8/10$ baseline re-runs in progress.}
+$\dagger$ qNParEGO $m{=}8$ ($K{=}8$): 3/5 seeds complete.\\
+$\ddagger$ From the $K{=}5$ default campaign (5 seeds).}
 \end{table}
 
 \emph{See Figure~\ref{fig:convergence_m10} in Appendix~\ref{app:extended}.}
 
 \textbf{Performance at $m=5$.} With $K{=}m{=}5$, qNParEGO leads with HV $\mathbf{6.44 \pm 0.16}$ vs qSTCH-Set $6.22 \pm 0.50$. At low $m$, random Chebyshev weights still cover the objective simplex effectively, so the coordination advantage of set-based acquisition has not yet materialized. However, the $K$-ablation study (Table~\ref{tab:ablation_k}) reveals that increasing $K$ beyond~$m$ improves both mean and consistency ($K{=}10$: $6.24 \pm 0.36$), suggesting the set mechanism becomes beneficial with larger batches.
 
-\textbf{Scaling to $m=8$.} With $K{=}m{=}8$, qSTCH-Set achieves HV $20.22 \pm 1.90$, comparable to qNParEGO $\mathbf{20.45 \pm 0.53}$ (3/5 seeds). The gap has closed substantially from the $K{=}5$ default ($19.26$ vs $20.89$), demonstrating that matching $K$ to $m$ is critical. STCH-NParEGO ($16.63 \pm 0.23$) and Random ($17.63 \pm 0.29$) fall well behind both methods.
+\textbf{Scaling to $m=8$.} With $K{=}m{=}8$, qSTCH-Set achieves HV $20.22 \pm 1.90$, comparable to qNParEGO $\mathbf{20.45 \pm 0.53}$$^\dagger$. The gap has closed substantially from the $K{=}5$ default ($19.26$ vs $20.89$), demonstrating that matching $K$ to $m$ is critical. STCH-NParEGO ($16.63 \pm 0.23$) and Random ($17.63 \pm 0.29$) fall well behind both methods.
 
 \textbf{Scaling to $m=10$.} The advantage of set-based acquisition emerges at $m{=}10$. With $K{=}m{=}10$, qSTCH-Set achieves HV $\mathbf{47.92 \pm 2.96}$, outperforming qNParEGO ($45.59 \pm 1.30$) by $5.1\%$. STCH-NParEGO ($38.39 \pm 0.72$) and Random ($40.44 \pm 0.33$) fall far behind---notably, random search outperforms single-point STCH at $m{=}10$, underscoring that uncoordinated scalarization degrades rapidly with~$m$ as random weights concentrate in the simplex interior and fail to cover extremal trade-off directions.
 
