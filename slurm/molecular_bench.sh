@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=mol-redox
 #SBATCH --account=def-ravh011
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
@@ -45,7 +45,7 @@ python benchmarks/molecular_benchmark.py \
   --seeds 5 \
   --n-init 20 \
   --n-iters 30 \
-  --batch-size 2 \
+  --batch-size 4 \
   --mc-samples 64 \
   --output-dir $RESULTS \
   --device cpu
