@@ -51,6 +51,7 @@ from botorch.utils.sampling import sample_simplex
 from gpytorch.mlls.sum_marginal_log_likelihood import SumMarginalLogLikelihood
 
 from stch_botorch.acquisition.stch_set_bo import qSTCHSet
+from stch_botorch.kernels.tanimoto import TanimotoKernel
 
 warnings.filterwarnings("ignore", category=BadInitialCandidatesWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -134,15 +135,30 @@ def _compute_morgan_fps(smiles_list, radius=2, n_bits=1024):
 # Model fitting
 # ---------------------------------------------------------------------------
 
-def fit_model(train_x, train_y):
-    """Fit independent single-task GP per objective (ModelListGP)."""
+def fit_model(train_x, train_y, kernel="rbf"):
+    """Fit independent single-task GP per objective (ModelListGP).
+
+    Args:
+        kernel: "rbf" (default BoTorch) or "tanimoto" (Tanimoto similarity)
+    """
+    import gpytorch
+
     models = []
     for i in range(train_y.shape[-1]):
-        gp = SingleTaskGP(
-            train_x,
-            train_y[..., i:i+1],
-            outcome_transform=Standardize(m=1),
-        )
+        if kernel == "tanimoto":
+            covar = gpytorch.kernels.ScaleKernel(TanimotoKernel())
+            gp = SingleTaskGP(
+                train_x,
+                train_y[..., i:i+1],
+                covar_module=covar,
+                outcome_transform=Standardize(m=1),
+            )
+        else:
+            gp = SingleTaskGP(
+                train_x,
+                train_y[..., i:i+1],
+                outcome_transform=Standardize(m=1),
+            )
         models.append(gp)
     model = ModelListGP(*models)
     mll = SumMarginalLogLikelihood(model.likelihood, model)
@@ -353,6 +369,7 @@ def run_molecular_benchmark(
     device,
     dtype,
     fast_stch: bool = True,
+    kernel: str = "rbf",
 ):
     """Pool-based multi-objective BO following Kristiadi et al. Algorithm 1."""
 
@@ -382,7 +399,7 @@ def run_molecular_benchmark(
         ymin, ymax = Y_pool[:, i].min().item(), Y_pool[:, i].max().item()
         print(f"    {name}: [{ymin:.4f}, {ymax:.4f}]")
     print(f"  n_init: {n_init} | n_iters: {n_iters} | batch_size (K): {batch_size}")
-    print(f"  MC samples: {mc_samples} | Seeds: {n_seeds}")
+    print(f"  MC samples: {mc_samples} | Seeds: {n_seeds} | Kernel: {kernel}")
     print(f"  Oracle HV (full pool): {oracle_hv:.6e}")
     print(f"  Ref point: {[f'{x:.4f}' for x in ref_point.cpu().tolist()]}")
     print(f"{'='*70}")
@@ -436,7 +453,7 @@ def run_molecular_benchmark(
                     chosen_pool_idx = [rem_idx[i] for i in chosen_local]
 
                 elif method == "qnparego":
-                    model = fit_model(X_train, Y_train)
+                    model = fit_model(X_train, Y_train, kernel=kernel)
                     chosen_local = select_qnparego(
                         model, X_remaining, Y_train, batch_size,
                         mc_samples, device, dtype
@@ -444,7 +461,7 @@ def run_molecular_benchmark(
                     chosen_pool_idx = [rem_idx[i] for i in chosen_local]
 
                 elif method == "qstch_set":
-                    model = fit_model(X_train, Y_train)
+                    model = fit_model(X_train, Y_train, kernel=kernel)
                     select_fn = select_qstch_set_fast if fast_stch else select_qstch_set
                     chosen_local = select_fn(
                         model, X_remaining, Y_train, batch_size,
@@ -478,6 +495,8 @@ def run_molecular_benchmark(
         "pool_size": N,
         "feature_dim": d,
         "num_objectives": num_obj,
+        "objective_names": obj_names,
+        "kernel": kernel,
         "n_init": n_init,
         "n_iters": n_iters,
         "batch_size": batch_size,
@@ -554,6 +573,9 @@ if __name__ == "__main__":
     parser.add_argument("--fast-stch", action="store_true", default=True,
                         help="Use fast greedy STCH-Set selection (default)")
     parser.add_argument("--no-fast-stch", action="store_false", dest="fast_stch")
+    parser.add_argument("--kernel", type=str, default="rbf",
+                        choices=["rbf", "tanimoto"],
+                        help="GP kernel: rbf (default) or tanimoto")
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
@@ -563,7 +585,7 @@ if __name__ == "__main__":
     device = torch.device(args.device)
 
     if args.output_dir is None:
-        out = Path(__file__).parent.parent / "results" / f"molecular_{args.dataset}"
+        out = Path(__file__).parent.parent / "results" / f"molecular_{args.dataset}_{args.kernel}"
     else:
         out = Path(args.output_dir)
 
@@ -578,4 +600,5 @@ if __name__ == "__main__":
         device=device,
         dtype=dtype,
         fast_stch=args.fast_stch,
+        kernel=args.kernel,
     )
