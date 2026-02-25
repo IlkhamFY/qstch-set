@@ -59,8 +59,8 @@ JOB_DTLZ2=$(sbatch --parsable <<'DTLZ2_EOF'
 # 0-4: m=5, 5-9: m=8, 10-14: m=10
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/setup_venv.sh"
+# SCRIPT_DIR removed - using absolute path
+source /project/rrg-ravh011/ilkham/stch-botorch/slurm/setup_venv.sh
 
 IDX=$SLURM_ARRAY_TASK_ID
 if [ $IDX -lt 5 ]; then
@@ -118,8 +118,8 @@ JOB_VS=$(sbatch --parsable <<'VS_EOF'
 #SBATCH --mail-user=zolotoymuravey@gmail.com
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/setup_venv.sh"
+# SCRIPT_DIR removed - using absolute path
+source /project/rrg-ravh011/ilkham/stch-botorch/slurm/setup_venv.sh
 RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_vehiclesafety_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
@@ -144,8 +144,8 @@ JOB_PEN=$(sbatch --parsable <<'PEN_EOF'
 #SBATCH --mail-user=zolotoymuravey@gmail.com
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/setup_venv.sh"
+# SCRIPT_DIR removed - using absolute path
+source /project/rrg-ravh011/ilkham/stch-botorch/slurm/setup_venv.sh
 RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_penicillin_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
@@ -170,8 +170,8 @@ JOB_CS=$(sbatch --parsable <<'CS_EOF'
 #SBATCH --mail-user=zolotoymuravey@gmail.com
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/setup_venv.sh"
+# SCRIPT_DIR removed - using absolute path
+source /project/rrg-ravh011/ilkham/stch-botorch/slurm/setup_venv.sh
 RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_carsideimpact_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
@@ -205,8 +205,8 @@ JOB_ABL=$(sbatch --parsable <<'ABL_EOF'
 # 3-6: mu ablation (mu=0.01,0.1,0.5,1.0) on DTLZ2 m=5
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/setup_venv.sh"
+# SCRIPT_DIR removed - using absolute path
+source /project/rrg-ravh011/ilkham/stch-botorch/slurm/setup_venv.sh
 
 IDX=$SLURM_ARRAY_TASK_ID
 RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/ablations_v8"
@@ -261,8 +261,8 @@ JOB_BM=$(sbatch --parsable <<'BM_EOF'
 # 2: m=10 (q=10, 20 iters → 200 function evals)
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/setup_venv.sh"
+# SCRIPT_DIR removed - using absolute path
+source /project/rrg-ravh011/ilkham/stch-botorch/slurm/setup_venv.sh
 
 IDX=$SLURM_ARRAY_TASK_ID
 cd "$STCH_ROOT"
