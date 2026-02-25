@@ -106,15 +106,21 @@ def smooth_chebyshev(
             f"got {weights.shape[-1]}"
         )
 
-    # Compute weighted deviations: D_i = w_i * (y_i - z*_i)
-    # Per Lin et al. ICLR 2025 Eq. 5: g_STCH = mu * log(sum(exp(w_i(f_i - z*_i) / mu)))
-    # Shape: (..., m)
-    weighted_distances = weights * (Y - ref_point)
+    # Compute smooth Tchebycheff scalarization.
+    # Per Lin et al. ICML 2024: g_STCH = mu * log(sum(exp(f_i - z*_i) / mu))
+    #
+    # Weights are applied as log-additive terms to preserve the temperature mu:
+    #   logsumexp((f_i - z*_i) / mu + log(w_i))
+    # This is equivalent to: log(sum(w_i * exp((f_i - z*_i) / mu)))
+    #
+    # IMPORTANT: Do NOT multiply weights inside the exp argument as w*(f-z*)/mu,
+    # because with normalized weights (sum=1, w_i=1/m), this reduces the effective
+    # temperature to mu/m, collapsing gradients. See docs/ACQUISITION_ANALYSIS.md.
+    deviations = (Y - ref_point) / mu + torch.log(weights)
 
     # BoTorch maximizes utility, so negate the scalarization:
-    # utility = -g_STCH = -mu * logsumexp(w_i(Y_i - z*_i) / mu)
     # Lower Y → lower g_STCH → higher utility (correct for minimization objectives)
-    utility = -mu * torch.logsumexp(weighted_distances / mu, dim=-1)
+    utility = -mu * torch.logsumexp(deviations, dim=-1)
 
     return utility
 
@@ -191,14 +197,22 @@ def smooth_chebyshev_set(
         )
 
     # Inner aggregation: Smooth min over batch (dim=-2, the q dimension)
-    # inner = -mu * logsumexp(-f_values / mu)
+    # Per Lin et al. ICLR 2025: inner_i = -mu * logsumexp(-f_i(x_k) / mu, dim=k)
+    # This approximates min_k f_i(x_k) for each objective i.
     # Shape: (..., m)
     inner = -mu * torch.logsumexp(-Y / mu, dim=-2)
 
     # Outer aggregation: Smooth max over objectives (dim=-1, the m dimension)
-    # S = mu * logsumexp(weights * (inner - z*) / mu)
+    # Per Lin et al. ICLR 2025: S = mu * logsumexp((inner_i - z*_i) / mu)
+    #
+    # Weights are applied as log-additive terms to preserve the temperature mu:
+    #   logsumexp((inner_i - z*_i) / mu + log(w_i))
+    #
+    # IMPORTANT: Do NOT multiply weights inside the exp argument as w*(inner-z*)/mu,
+    # because with normalized weights (sum=1, w_i=1/m), this reduces the effective
+    # temperature to mu/m, collapsing gradients. See docs/ACQUISITION_ANALYSIS.md.
     # Shape: (...)
-    S = mu * torch.logsumexp(weights * (inner - ref_point) / mu, dim=-1)
+    S = mu * torch.logsumexp((inner - ref_point) / mu + torch.log(weights), dim=-1)
 
     # Return negative for maximization (BoTorch maximizes utility)
     # Utility = -S

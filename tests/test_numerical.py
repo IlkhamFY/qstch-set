@@ -59,19 +59,24 @@ class TestSignConvention:
         )
 
     def test_paper_equation_5_exact(self):
-        """Directly verify against paper Eq 5.
+        """Directly verify against paper Eq 5 with log-additive weights.
         
-        g^(STCH) = μ log(Σ exp(λ_i(f_i - z*_i)/μ))
+        g^(STCH) = μ log(Σ w_i * exp((f_i - z*_i)/μ))
+                 = μ logsumexp((f_i - z*_i)/μ + log(w_i))
         utility = -g^(STCH)
+        
+        Note: weights are log-additive to preserve the temperature μ.
+        The old formula w*(f-z*)/μ reduced effective temperature to μ/m.
+        See docs/ACQUISITION_ANALYSIS.md for derivation.
         """
         weights = torch.tensor([0.5, 0.5])
         ref_point = torch.tensor([0.0, 0.0])
         Y = torch.tensor([[3.0, 1.0]])
         mu = 0.1
         
-        # Manual computation per paper Eq 5
-        d = weights * (Y - ref_point)  # λ_i * (f_i - z*_i)
-        g_paper = mu * torch.logsumexp(d / mu, dim=-1)
+        # Manual computation: logsumexp((f_i - z*_i)/μ + log(w_i))
+        deviations = (Y - ref_point) / mu + torch.log(weights)
+        g_paper = mu * torch.logsumexp(deviations, dim=-1)
         expected_utility = -g_paper
         
         actual_utility = smooth_chebyshev(Y, weights, ref_point, mu=mu)
@@ -86,14 +91,19 @@ class TestConvergenceMuToZero:
     """As μ→0, STCH should converge to TCH (hard max)."""
     
     def test_single_solution_converges_to_tch(self):
-        """smooth_chebyshev → -max_i(λ_i(Y_i - z*_i)) as μ→0."""
+        """smooth_chebyshev → -max_i(Y_i - z*_i) as μ→0.
+        
+        With log-additive weights, the limit as μ→0 is the unweighted hard max
+        of (Y_i - z*_i), because μ*log(w_i) vanishes. This matches Lin et al.'s
+        formulation which has no weights.
+        """
         weights = torch.tensor([0.3, 0.7])
         ref_point = torch.tensor([0.0, 0.0])
         Y = torch.tensor([[2.0, 3.0]])
         
-        # True TCH value: max(0.3*2, 0.7*3) = max(0.6, 2.1) = 2.1
-        # Utility = -2.1
-        tch_utility = -(weights * (Y - ref_point)).max(dim=-1).values
+        # True TCH value (unweighted): max(2-0, 3-0) = 3.0
+        # Utility = -3.0
+        tch_utility = -(Y - ref_point).max(dim=-1).values
         
         mus = [1.0, 0.1, 0.01, 0.001]
         utilities = [smooth_chebyshev(Y, weights, ref_point, mu=m).item() for m in mus]
@@ -111,17 +121,21 @@ class TestConvergenceMuToZero:
         )
 
     def test_set_scalarization_converges(self):
-        """smooth_chebyshev_set → -max_i(λ_i * min_k(Y_ik - z*_i)) as μ→0."""
+        """smooth_chebyshev_set → -max_i(min_k(Y_ik - z*_i)) as μ→0.
+        
+        With log-additive weights, the limit is the unweighted hard max of
+        the per-objective minimums (matching Lin et al.'s formulation).
+        """
         weights = torch.tensor([0.5, 0.5])
         ref_point = torch.tensor([0.0, 0.0])
         # Two solutions, two objectives
         Y = torch.tensor([[[1.0, 4.0], [3.0, 2.0]]])  # (1, 2, 2)
         
-        # TCH-Set: max_i(λ_i * min_k(Y_ik - z*_i))
-        # obj 0: min(1,3)=1, weighted: 0.5*1=0.5
-        # obj 1: min(4,2)=2, weighted: 0.5*2=1.0
-        # max(0.5, 1.0) = 1.0, utility = -1.0
-        tch_set_utility = -1.0
+        # TCH-Set (unweighted): max_i(min_k(Y_ik - z*_i))
+        # obj 0: min(1,3)=1
+        # obj 1: min(4,2)=2
+        # max(1, 2) = 2.0, utility = -2.0
+        tch_set_utility = -2.0
         
         mus = [1.0, 0.1, 0.01, 0.001]
         utilities = [smooth_chebyshev_set(Y, weights, ref_point, mu=m).item() for m in mus]

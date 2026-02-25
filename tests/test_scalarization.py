@@ -90,14 +90,17 @@ class TestSmoothChebyshev:
         assert not torch.allclose(Y.grad, torch.zeros_like(Y.grad))
 
     def test_convergence_to_tchebyshev(self):
-        """Test that STCH converges to TCH as mu -> 0."""
+        """Test that STCH converges to TCH as mu -> 0.
+        
+        With log-additive weights, the limit is the unweighted hard max:
+        utility = -max_i(Y_i - z*_i)
+        """
         Y = torch.tensor([[1.0, 2.0], [2.0, 1.0]])
         weights = torch.tensor([0.5, 0.5])
         ref_point = torch.tensor([0.0, 0.0])
 
-        # Compute true Tchebycheff: utility = -max(w_i * (Y_i - z*_i))
-        weighted_distances = weights * (Y - ref_point)
-        tch_values = -weighted_distances.max(dim=-1)[0]  # Negative for maximization
+        # Compute true Tchebycheff (unweighted): utility = -max(Y_i - z*_i)
+        tch_values = -(Y - ref_point).max(dim=-1)[0]  # Negative for maximization
 
         # Compute STCH with decreasing mu
         mus = [1.0, 0.1, 0.01, 0.001]
