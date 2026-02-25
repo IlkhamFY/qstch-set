@@ -287,8 +287,7 @@ class TestqSTCHSet:
             mu=0.1,
             sampler=sampler,
         )
-        assert acqf.Y_range is None
-        assert acqf.Y_min is None
+        assert acqf.Y_bounds is None
 
         X = torch.rand(2, 3, 4, dtype=DTYPE)
         val = acqf(X)

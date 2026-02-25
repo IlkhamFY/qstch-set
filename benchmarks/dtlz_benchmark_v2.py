@@ -185,11 +185,18 @@ def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1, 
         try:
             model = fit_model(train_X, train_Y)
 
+            # Normalize using posterior mean predictions — mirrors
+            # get_chebyshev_scalarization(weights, Y=pred) pattern.
+            with torch.no_grad():
+                pred = model.posterior(train_X).mean
+            Y_bounds = torch.stack([pred.min(dim=0).values, pred.max(dim=0).values])
+
             acqf = qSTCHSet(
                 model=model,
                 ref_point=ref_point,
                 mu=mu,
                 sampler=SobolQMCNormalSampler(sample_shape=torch.Size([opt["mc_samples"]])),
+                Y_bounds=Y_bounds,
                 maximize=True,
             )
 
