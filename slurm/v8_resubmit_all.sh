@@ -160,7 +160,7 @@ JOB_CS=$(sbatch --parsable <<'CS_EOF'
 #!/bin/bash
 #SBATCH --job-name=v8-carsideimpact
 #SBATCH --account=rrg-ravh011_gpu
-#SBATCH --time=6:00:00
+#SBATCH --time=24:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G

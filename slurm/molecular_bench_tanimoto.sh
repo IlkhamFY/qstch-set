@@ -30,7 +30,10 @@ source $SLURM_TMPDIR/mol-venv/bin/activate
 pip install --no-index torch botorch gpytorch 2>/dev/null || true
 
 cd $PROJECT
+# Set PYTHONPATH explicitly — pip install -e . is unreliable on Nibi NFS
+export PYTHONPATH="$PROJECT/src:$PYTHONPATH"
 pip install --no-index -e . 2>/dev/null || pip install -e . 2>/dev/null || true
+python -c "from stch_botorch.kernels.tanimoto import TanimotoKernel; print('stch_botorch.kernels ok')"
 
 python -c "from rdkit import Chem; print('rdkit ok')" 2>/dev/null || \
   echo "WARNING: rdkit not available"
