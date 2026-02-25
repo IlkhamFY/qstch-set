@@ -1,13 +1,13 @@
 #!/bin/bash
 # =============================================================================
-# V5 FULL BENCHMARK RESUBMISSION
+# v8 FULL BENCHMARK RESUBMISSION
 # =============================================================================
 # Context: The scalarization had a critical temperature bug where weights
 # multiplied inside logsumexp reduced effective mu by factor m.
 # Fixed in commit 4b4050a (log-additive weights).
 # ALL prior results are invalidated. This reruns everything from scratch.
 #
-# Usage: bash slurm/v5_resubmit_all.sh  (from project root on Nibi login node)
+# Usage: bash slurm/v8_resubmit_all.sh  (from project root on Nibi login node)
 # =============================================================================
 
 set -euo pipefail
@@ -21,7 +21,7 @@ RESULTS_BASE="$PROJ/results"
 mkdir -p "$LOG_DIR"
 
 echo "============================================================"
-echo "V5 FULL BENCHMARK RESUBMISSION"
+echo "v8 FULL BENCHMARK RESUBMISSION"
 echo "Date: $(date)"
 echo "Project: $PROJ"
 echo "Git HEAD: $(cd $PROJ && git log --oneline -1)"
@@ -43,14 +43,14 @@ echo "=== Submitting DTLZ2 benchmarks ==="
 
 JOB_DTLZ2=$(sbatch --parsable <<'DTLZ2_EOF'
 #!/bin/bash
-#SBATCH --job-name=v5-dtlz2
+#SBATCH --job-name=v8-dtlz2
 #SBATCH --account=rrg-ravh011_gpu
 #SBATCH --time=6:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_dtlz2_%A_%a.out
-#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_dtlz2_%A_%a.err
+#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_dtlz2_%A_%a.out
+#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_dtlz2_%A_%a.err
 #SBATCH --array=0-14
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=zolotoymuravey@gmail.com
@@ -71,10 +71,10 @@ else
     M=10; SEED=$((IDX - 10)); ITERS=20
 fi
 
-RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/dtlz2_m${M}_v5"
+RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/dtlz2_m${M}_v8"
 mkdir -p "$RESULTS_DIR"
 
-echo "[$(date)] V5 DTLZ2 m=$M seed=$SEED iters=$ITERS (array idx=$IDX)"
+echo "[$(date)] v8 DTLZ2 m=$M seed=$SEED iters=$ITERS (array idx=$IDX)"
 echo "[$(date)] Node: $(hostname), GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 
 cd "$STCH_ROOT"
@@ -106,24 +106,24 @@ echo "=== Submitting real-world benchmarks ==="
 
 JOB_VS=$(sbatch --parsable <<'VS_EOF'
 #!/bin/bash
-#SBATCH --job-name=v5-vehiclesafety
+#SBATCH --job-name=v8-vehiclesafety
 #SBATCH --account=rrg-ravh011_gpu
 #SBATCH --time=6:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_vehiclesafety_%j.out
-#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_vehiclesafety_%j.err
+#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_vehiclesafety_%j.out
+#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_vehiclesafety_%j.err
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=zolotoymuravey@gmail.com
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/setup_venv.sh"
-RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_vehiclesafety_v5"
+RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_vehiclesafety_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
-echo "[$(date)] V5 VehicleSafety on $(hostname)"
+echo "[$(date)] v8 VehicleSafety on $(hostname)"
 python benchmarks/real_world_benchmark.py --problem VehicleSafety --seeds 5 --output-dir "$RESULTS_DIR" --device cuda
 echo "[$(date)] DONE"
 VS_EOF
@@ -132,24 +132,24 @@ echo "  VehicleSafety: $JOB_VS"
 
 JOB_PEN=$(sbatch --parsable <<'PEN_EOF'
 #!/bin/bash
-#SBATCH --job-name=v5-penicillin
+#SBATCH --job-name=v8-penicillin
 #SBATCH --account=rrg-ravh011_gpu
 #SBATCH --time=6:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_penicillin_%j.out
-#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_penicillin_%j.err
+#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_penicillin_%j.out
+#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_penicillin_%j.err
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=zolotoymuravey@gmail.com
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/setup_venv.sh"
-RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_penicillin_v5"
+RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_penicillin_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
-echo "[$(date)] V5 Penicillin on $(hostname)"
+echo "[$(date)] v8 Penicillin on $(hostname)"
 python benchmarks/real_world_benchmark.py --problem Penicillin --seeds 5 --output-dir "$RESULTS_DIR" --device cuda
 echo "[$(date)] DONE"
 PEN_EOF
@@ -158,24 +158,24 @@ echo "  Penicillin: $JOB_PEN"
 
 JOB_CS=$(sbatch --parsable <<'CS_EOF'
 #!/bin/bash
-#SBATCH --job-name=v5-carsideimpact
+#SBATCH --job-name=v8-carsideimpact
 #SBATCH --account=rrg-ravh011_gpu
 #SBATCH --time=6:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_carsideimpact_%j.out
-#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_carsideimpact_%j.err
+#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_carsideimpact_%j.out
+#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_carsideimpact_%j.err
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=zolotoymuravey@gmail.com
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/setup_venv.sh"
-RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_carsideimpact_v5"
+RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/real_world_carsideimpact_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
-echo "[$(date)] V5 CarSideImpact on $(hostname)"
+echo "[$(date)] v8 CarSideImpact on $(hostname)"
 python benchmarks/real_world_benchmark.py --problem CarSideImpact --seeds 5 --output-dir "$RESULTS_DIR" --device cuda
 echo "[$(date)] DONE"
 CS_EOF
@@ -189,14 +189,14 @@ echo "=== Submitting ablation studies ==="
 
 JOB_ABL=$(sbatch --parsable <<'ABL_EOF'
 #!/bin/bash
-#SBATCH --job-name=v5-ablation
+#SBATCH --job-name=v8-ablation
 #SBATCH --account=rrg-ravh011_gpu
 #SBATCH --time=3:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_ablation_%A_%a.out
-#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_ablation_%A_%a.err
+#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_ablation_%A_%a.out
+#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_ablation_%A_%a.err
 #SBATCH --array=0-6
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=zolotoymuravey@gmail.com
@@ -209,14 +209,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/setup_venv.sh"
 
 IDX=$SLURM_ARRAY_TASK_ID
-RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/ablations_v5"
+RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/ablations_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
 
 if [ $IDX -lt 3 ]; then
     K_VALUES=(3 5 10)
     K=${K_VALUES[$IDX]}
-    echo "[$(date)] V5 K ablation: K=$K on DTLZ2 m=5"
+    echo "[$(date)] v8 K ablation: K=$K on DTLZ2 m=5"
     python benchmarks/dtlz_benchmark_v2.py \
         --problem DTLZ2 --m 5 --seeds 3 --iters 30 \
         --ablation k --k-value "$K" \
@@ -224,7 +224,7 @@ if [ $IDX -lt 3 ]; then
 else
     MU_VALUES=(0.01 0.1 0.5 1.0)
     MU=${MU_VALUES[$((IDX - 3))]}
-    echo "[$(date)] V5 mu ablation: mu=$MU on DTLZ2 m=5"
+    echo "[$(date)] v8 mu ablation: mu=$MU on DTLZ2 m=5"
     python benchmarks/dtlz_benchmark_v2.py \
         --problem DTLZ2 --m 5 --seeds 3 --iters 30 \
         --ablation mu --mu-value "$MU" \
@@ -243,14 +243,14 @@ echo "=== Submitting budget-matched baselines ==="
 
 JOB_BM=$(sbatch --parsable <<'BM_EOF'
 #!/bin/bash
-#SBATCH --job-name=v5-budget-matched
+#SBATCH --job-name=v8-budget-matched
 #SBATCH --account=rrg-ravh011_gpu
 #SBATCH --time=8:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_budget_%A_%a.out
-#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v5_budget_%A_%a.err
+#SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_budget_%A_%a.out
+#SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_budget_%A_%a.err
 #SBATCH --array=0-2
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=zolotoymuravey@gmail.com
@@ -269,18 +269,18 @@ cd "$STCH_ROOT"
 
 if [ $IDX -eq 0 ]; then
     M=5; ITERS=30
-    RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/budget_matched_m5_v5"
+    RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/budget_matched_m5_v8"
 elif [ $IDX -eq 1 ]; then
     M=8; ITERS=25
-    RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/budget_matched_m8_v5"
+    RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/budget_matched_m8_v8"
 else
     M=10; ITERS=20
-    RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/budget_matched_m10_v5"
+    RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/budget_matched_m10_v8"
 fi
 
 mkdir -p "$RESULTS_DIR"
 
-echo "[$(date)] V5 Budget-matched qNParEGO: m=$M q=$M iters=$ITERS"
+echo "[$(date)] v8 Budget-matched qNParEGO: m=$M q=$M iters=$ITERS"
 python benchmarks/dtlz_benchmark_v2.py \
     --problem DTLZ2 --m "$M" --seeds 5 --iters "$ITERS" \
     --methods qnparego --batch-size "$M" \
@@ -296,7 +296,7 @@ echo "  Budget-matched: $JOB_BM (3 tasks: m=5/8/10)"
 
 echo ""
 echo "============================================================"
-echo "V5 SUBMISSION COMPLETE"
+echo "v8 SUBMISSION COMPLETE"
 echo "============================================================"
 echo ""
 echo "Jobs submitted:"
@@ -309,11 +309,11 @@ echo "  Budget-matched (3 tasks): $JOB_BM"
 echo ""
 echo "Total: 28 GPU tasks"
 echo ""
-echo "Results directories (all _v5):"
-echo "  $RESULTS_BASE/dtlz2_m{5,8,10}_v5/"
-echo "  $RESULTS_BASE/real_world_{vehiclesafety,penicillin,carsideimpact}_v5/"
-echo "  $RESULTS_BASE/ablations_v5/"
-echo "  $RESULTS_BASE/budget_matched_m{5,8,10}_v5/"
+echo "Results directories (all _v8):"
+echo "  $RESULTS_BASE/dtlz2_m{5,8,10}_v8/"
+echo "  $RESULTS_BASE/real_world_{vehiclesafety,penicillin,carsideimpact}_v8/"
+echo "  $RESULTS_BASE/ablations_v8/"
+echo "  $RESULTS_BASE/budget_matched_m{5,8,10}_v8/"
 echo ""
 echo "Monitor: squeue -u ilkham"
 echo "Check:   sacct -j <JOBID> --format=JobID,State,Elapsed,MaxRSS"
