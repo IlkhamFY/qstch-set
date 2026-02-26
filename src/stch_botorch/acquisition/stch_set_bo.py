@@ -259,3 +259,78 @@ class qSTCHSetTS(MCAcquisitionFunction):
 
         acq_values = smooth_chebyshev_set(Y=Y, weights=self.weights, ref_point=ref, mu=self.mu)
         return acq_values.squeeze(0)
+
+
+class qSTCHSetPure(MCAcquisitionFunction):
+    """Lin et al.'s exact STCH-Set formula adapted to BoTorch GP posterior samples.
+
+    This is a faithful port of Xi-L/STCH-Set (ICLR 2025), no modifications:
+
+        value = mu * logsumexp(-mu * logsumexp(-Y / mu, dim=K) / mu, dim=m)
+
+    No weights. No reference point. Pure nested logsumexp.
+
+    Used as a diagnostic baseline to compare against qSTCHSet (which adds
+    uniform weights + ref_point). Since uniform weights are a constant offset
+    and ref_point is just a shift, the two should behave similarly — but this
+    lets us verify empirically and respond to reviewer questions about fidelity
+    to the original formulation.
+
+    Args:
+        model: A fitted multi-output BoTorch model.
+        mu: Smoothing parameter. Default 0.1 (same as Lin et al.).
+        sampler: MC sampler. Default: SobolQMCNormalSampler(256).
+        X_pending: Pending points of shape (p, d).
+        maximize: BoTorch maximization convention. Default True.
+
+    Note on sign convention:
+        Lin et al. minimize objectives. BoTorch maximizes. With maximize=True,
+        posterior samples are negated before applying the formula so that
+        "lower cost = better" semantics are preserved.
+    """
+
+    def __init__(
+        self,
+        model: Model,
+        mu: float = 0.1,
+        sampler: Optional[SobolQMCNormalSampler] = None,
+        X_pending: Optional[Tensor] = None,
+        maximize: bool = True,
+    ) -> None:
+        if sampler is None:
+            sampler = SobolQMCNormalSampler(sample_shape=torch.Size([256]))
+        objective = IdentityMCMultiOutputObjective()
+        super().__init__(model=model, sampler=sampler, objective=objective)
+        self.mu = mu
+        self.maximize = maximize
+        if X_pending is not None:
+            self.set_X_pending(X_pending)
+
+    @concatenate_pending_points
+    @t_batch_mode_transform()
+    def forward(self, X: Tensor) -> Tensor:
+        """Evaluate Lin et al.'s exact STCH-Set formula.
+
+        Args:
+            X: Candidate points of shape (batch_shape x q x d).
+
+        Returns:
+            Acquisition values of shape (batch_shape,). Higher is better.
+        """
+        posterior = self.model.posterior(X)
+        samples = self.sampler(posterior)
+        samples = self.objective(samples, X)
+        # samples: (num_samples x batch_shape x q x m)
+
+        # Convert to minimization space
+        Y = -samples if self.maximize else samples
+
+        mu = self.mu
+        # Lin et al. Eq. 12 (ICLR 2025):
+        #   inner_i = -mu * logsumexp(-Y_i / mu, dim=K)   [smooth min over K, per obj]
+        #   value   =  mu * logsumexp(-inner / mu, dim=m)  [smooth max over m]
+        inner = -mu * torch.logsumexp(-Y / mu, dim=-2)        # (..., m)
+        acq_values = mu * torch.logsumexp(-inner / mu, dim=-1)  # (...)
+
+        # Negate: higher acquisition = better set (maximization convention)
+        return (-acq_values).mean(dim=0)

@@ -52,7 +52,7 @@ warnings.filterwarnings("ignore")
 
 # Adjust path to include src
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from stch_botorch.acquisition.stch_set_bo import qSTCHSet
+from stch_botorch.acquisition.stch_set_bo import qSTCHSet, qSTCHSetPure
 from stch_botorch.scalarization import smooth_chebyshev
 
 # Global default, but will be set per process
@@ -250,6 +250,79 @@ def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1, 
         times.append(t1 - t0)
 
         # print(f"  STCH-Set(q={q},mu={mu}) iter {i+1}/{n_iters}: HV={hv:.4f}, time={t1-t0:.1f}s", flush=True)
+
+    return hv_history, times, errors
+
+
+def run_stch_set_pure(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1, device=None):
+    """Run qSTCHSetPure — Lin et al.'s exact formula, no weights, no ref point.
+
+    Used as a diagnostic baseline to verify that qSTCHSet (with uniform weights
+    and ref_point) behaves equivalently. If they produce similar results, it
+    confirms our additions don't meaningfully change the optimization landscape.
+    """
+    if device is None: device = tkwargs["device"]
+    kwargs = {"dtype": torch.double, "device": device}
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    opt = get_opt_params(m)
+
+    bounds = torch.stack([torch.zeros(d, **kwargs), torch.ones(d, **kwargs)])
+    train_X, train_Y = get_initial_data(problem, d, n_init, seed, device)
+    hv_history = [compute_hv(train_Y, ref_point)]
+    times = []
+    errors = []
+    prev_candidates = None
+
+    for i in range(n_iters):
+        t0 = time.time()
+        try:
+            model = fit_model(train_X, train_Y)
+
+            acqf = qSTCHSetPure(
+                model=model,
+                mu=mu,
+                sampler=SobolQMCNormalSampler(sample_shape=torch.Size([opt["mc_samples"]])),
+                maximize=True,
+            )
+
+            batch_initial_conditions = None
+            if prev_candidates is not None:
+                num_restarts = opt["num_restarts"]
+                if num_restarts > 1:
+                    raw_random = torch.rand(num_restarts - 1, q, d, **kwargs)
+                    raw_random = bounds[0] + (bounds[1] - bounds[0]) * raw_random
+                    batch_initial_conditions = torch.cat([prev_candidates.unsqueeze(0), raw_random], dim=0)
+                else:
+                    batch_initial_conditions = prev_candidates.unsqueeze(0)
+
+            candidates, _ = optimize_acqf(
+                acq_function=acqf,
+                bounds=bounds,
+                q=q,
+                num_restarts=opt["num_restarts"],
+                raw_samples=opt["raw_samples"],
+                options={"batch_limit": 5, "maxiter": opt["maxiter"]},
+                batch_initial_conditions=batch_initial_conditions,
+            )
+
+            prev_candidates = candidates.detach().clone()
+            new_Y = problem(candidates)
+            train_X = torch.cat([train_X, candidates])
+            train_Y = torch.cat([train_Y, new_Y])
+        except Exception as e:
+            errors.append({"iter": i, "error": str(e)})
+            candidates = torch.rand(q, d, **kwargs)
+            new_Y = problem(candidates)
+            train_X = torch.cat([train_X, candidates])
+            train_Y = torch.cat([train_Y, new_Y])
+            prev_candidates = None
+
+        t1 = time.time()
+        hv = compute_hv(train_Y, ref_point)
+        hv_history.append(hv)
+        times.append(t1 - t0)
 
     return hv_history, times, errors
 
@@ -486,7 +559,11 @@ def worker_run_method(kwargs):
     problem, _, ref_point = get_problem(problem_name, m, device=device)
     
     # Run
-    if method_name.startswith("stch_set"):
+    if method_name == "stch_set_pure":
+        return run_stch_set_pure(
+            problem, d, m, ref_point, n_init, n_iters, kwargs["K"], seed, kwargs["mu"], device=device
+        )
+    elif method_name.startswith("stch_set"):
         return run_stch_set_bo(
             problem, d, m, ref_point, n_init, n_iters, kwargs["K"], seed, kwargs["mu"], device=device
         )
@@ -529,7 +606,7 @@ def main():
     )
     parser.add_argument(
         "--methods", nargs="+",
-        default=["stch_set", "stch_nparego", "qnparego", "qehvi", "random"],
+        default=["stch_set", "stch_set_pure", "stch_nparego", "qnparego", "qehvi", "random"],
     )
     parser.add_argument("--output", default=None)
     parser.add_argument("--output-dir", default=None, help="Directory for output (overrides --output)")

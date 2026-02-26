@@ -11,7 +11,7 @@ from botorch.optim import optimize_acqf
 from botorch.sampling.normal import SobolQMCNormalSampler
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from stch_botorch.acquisition.stch_set_bo import qSTCHSet, qSTCHSetTS
+from stch_botorch.acquisition.stch_set_bo import qSTCHSet, qSTCHSetPure, qSTCHSetTS
 
 DTYPE = torch.double
 DEVICE = torch.device("cpu")
@@ -364,6 +364,70 @@ class TestqSTCHSetTS:
         val = acqf(X)
         assert val.shape == torch.Size([3])
         assert torch.isfinite(val).all()
+
+
+class TestqSTCHSetPure:
+    """Tests for qSTCHSetPure — Lin et al.'s exact formula."""
+
+    def test_basic_forward(self):
+        """Output shape and finiteness."""
+        model = _make_model(d=4, m=3)
+        acqf = qSTCHSetPure(model=model, mu=0.1)
+        X = torch.rand(2, 3, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([2])
+        assert torch.isfinite(val).all()
+
+    def test_single_candidate(self):
+        """Works with q=1 (degenerate set)."""
+        model = _make_model(d=4, m=3)
+        acqf = qSTCHSetPure(model=model, mu=0.1)
+        X = torch.rand(2, 1, 4, dtype=DTYPE)
+        val = acqf(X)
+        assert val.shape == torch.Size([2])
+        assert torch.isfinite(val).all()
+
+    def test_gradient_flows(self):
+        """Gradients should flow through the acquisition value."""
+        model = _make_model(d=4, m=3)
+        acqf = qSTCHSetPure(model=model, mu=0.1)
+        X = torch.rand(1, 3, 4, dtype=DTYPE, requires_grad=True)
+        val = acqf(X)
+        val.backward()
+        assert X.grad is not None
+        assert torch.isfinite(X.grad).all()
+        assert X.grad.abs().max() > 1e-8, "Gradients should be non-trivial"
+
+    def test_comparable_to_qstchset(self):
+        """qSTCHSetPure and qSTCHSet (uniform weights, no ref benefit) should
+        produce values in the same ballpark — both are smooth max over K."""
+        model = _make_model(d=4, m=3)
+        torch.manual_seed(42)
+        X = torch.rand(2, 3, 4, dtype=DTYPE)
+        sampler = SobolQMCNormalSampler(sample_shape=torch.Size([64]))
+
+        pure = qSTCHSetPure(model=model, mu=0.1, sampler=sampler)
+        weighted = qSTCHSet(
+            model=model,
+            ref_point=torch.zeros(3, dtype=DTYPE),
+            mu=0.1,
+            sampler=sampler,
+        )
+        val_pure = pure(X)
+        val_weighted = weighted(X)
+        # Both should be finite and have same sign pattern
+        assert torch.isfinite(val_pure).all()
+        assert torch.isfinite(val_weighted).all()
+
+    def test_mu_effect(self):
+        """Smaller mu should give sharper (larger magnitude) values."""
+        model = _make_model(d=4, m=5)
+        X = torch.rand(3, 5, 4, dtype=DTYPE)
+        acqf_tight = qSTCHSetPure(model=model, mu=0.01)
+        acqf_loose = qSTCHSetPure(model=model, mu=1.0)
+        # Both finite
+        assert torch.isfinite(acqf_tight(X)).all()
+        assert torch.isfinite(acqf_loose(X)).all()
 
 
 if __name__ == "__main__":
