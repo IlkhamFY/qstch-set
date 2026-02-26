@@ -733,11 +733,14 @@ def main():
         all_times = []
         all_errors = []
 
-        # Run parallel
-        with Pool(processes=n_workers) as pool:
-            # We map the worker over tasks
-            # worker_run_method returns (hv_history, times, errors)
-            results_list = pool.map(worker_run_method, tasks)
+        # Run parallel (or sequential if n_workers==1 to avoid CUDA fork issues)
+        if n_workers <= 1:
+            results_list = [worker_run_method(t) for t in tasks]
+        else:
+            with Pool(processes=n_workers) as pool:
+                # We map the worker over tasks
+                # worker_run_method returns (hv_history, times, errors)
+                results_list = pool.map(worker_run_method, tasks)
             
         for res in results_list:
             hv_history, times, errors = res

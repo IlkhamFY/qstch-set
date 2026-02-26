@@ -92,6 +92,7 @@ python benchmarks/dtlz_benchmark_v2.py \
     --iters "$ITERS" \
     --output-dir "$RESULTS_DIR" \
     --device cuda \
+    --n-workers 1 \
     $EXTRA_ARGS
 
 echo "[$(date)] DONE: DTLZ2 m=$M seed=$SEED"
@@ -191,21 +192,20 @@ JOB_ABL=$(sbatch --parsable <<'ABL_EOF'
 #!/bin/bash
 #SBATCH --job-name=v8-ablation
 #SBATCH --account=rrg-ravh011_gpu
-#SBATCH --time=3:00:00
+#SBATCH --time=6:00:00
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --output=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_ablation_%A_%a.out
 #SBATCH --error=/project/rrg-ravh011/ilkham/stch-botorch/slurm/logs/v8_ablation_%A_%a.err
-#SBATCH --array=0-6
+#SBATCH --array=0-1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=zolotoymuravey@gmail.com
 
-# 0-2: K ablation (K=3,5,10) on DTLZ2 m=5
-# 3-6: mu ablation (mu=0.01,0.1,0.5,1.0) on DTLZ2 m=5
+# task 0: K ablation (K=3,5,10 looped internally by benchmark)
+# task 1: mu ablation (mu=0.01,0.1,0.5,1.0 looped internally by benchmark)
 
 set -e
-# SCRIPT_DIR removed - using absolute path
 source /project/rrg-ravh011/ilkham/stch-botorch/slurm/setup_venv.sh
 
 IDX=$SLURM_ARRAY_TASK_ID
@@ -213,28 +213,24 @@ RESULTS_DIR="/project/rrg-ravh011/ilkham/stch-botorch/results/ablations_v8"
 mkdir -p "$RESULTS_DIR"
 cd "$STCH_ROOT"
 
-if [ $IDX -lt 3 ]; then
-    K_VALUES=(3 5 10)
-    K=${K_VALUES[$IDX]}
-    echo "[$(date)] v8 K ablation: K=$K on DTLZ2 m=5"
+if [ $IDX -eq 0 ]; then
+    echo "[$(date)] v8 K ablation: K=3,5,10 on DTLZ2 m=5"
     python benchmarks/dtlz_benchmark_v2.py \
         --problem DTLZ2 --m 5 --seeds 3 --iters 30 \
-        --ablation k --k-value "$K" \
-        --output-dir "$RESULTS_DIR" --device cuda
+        --ablation k \
+        --output-dir "$RESULTS_DIR" --device cuda --n-workers 1
 else
-    MU_VALUES=(0.01 0.1 0.5 1.0)
-    MU=${MU_VALUES[$((IDX - 3))]}
-    echo "[$(date)] v8 mu ablation: mu=$MU on DTLZ2 m=5"
+    echo "[$(date)] v8 mu ablation: mu=0.01,0.1,0.5,1.0 on DTLZ2 m=5"
     python benchmarks/dtlz_benchmark_v2.py \
         --problem DTLZ2 --m 5 --seeds 3 --iters 30 \
-        --ablation mu --mu-value "$MU" \
-        --output-dir "$RESULTS_DIR" --device cuda
+        --ablation mu \
+        --output-dir "$RESULTS_DIR" --device cuda --n-workers 1
 fi
 
 echo "[$(date)] DONE: ablation task $IDX"
 ABL_EOF
 )
-echo "  Ablations: $JOB_ABL (7 tasks: K=3/5/10 + mu=0.01/0.1/0.5/1.0)"
+echo "  Ablations: $JOB_ABL (2 tasks: K-ablation + mu-ablation)"
 
 # ─── 4. BUDGET-MATCHED BASELINES ──────────────────────────────────
 
@@ -283,9 +279,9 @@ mkdir -p "$RESULTS_DIR"
 echo "[$(date)] v8 Budget-matched qNParEGO: m=$M q=$M iters=$ITERS"
 python benchmarks/dtlz_benchmark_v2.py \
     --problem DTLZ2 --m "$M" --seeds 5 --iters "$ITERS" \
-    --methods qnparego --batch-size "$M" \
+    --methods qnparego --q "$M" \
     --output-dir "$RESULTS_DIR" --device cuda \
-    --skip-qehvi
+    --skip-qehvi --n-workers 1
 
 echo "[$(date)] DONE: budget-matched m=$M"
 BM_EOF
