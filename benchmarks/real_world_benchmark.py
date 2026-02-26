@@ -179,19 +179,15 @@ def optimize_qnehvi(problem, model, train_x, train_obj, sampler, bounds, batch_s
 
 
 def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype):
-    # Compute normalization bounds from posterior mean predictions — mirrors
-    # how get_chebyshev_scalarization(weights, Y=pred) normalizes objectives.
-    # Using pred (not raw train_obj) gives tighter, noise-free bounds.
-    train_x_norm = normalize(train_x, bounds)
-    with torch.no_grad():
-        pred = model.posterior(train_x_norm).mean
-    Y_bounds = torch.stack([pred.min(dim=0).values, pred.max(dim=0).values])
+    # No explicit Y normalization: ModelListGP uses Standardize, which maps
+    # each objective to ~N(0,1) in the posterior. Thompson samples in forward()
+    # are already on a consistent scale, so mu=0.1 is appropriate without
+    # additional normalization. Y_bounds would double-normalize and distort gradients.
     acq = qSTCHSet(
         model=model,
         ref_point=ref_point,
         mu=0.1,
         sampler=sampler,
-        Y_bounds=Y_bounds,
     )
     candidates, _ = optimize_acqf(
         acq_function=acq,

@@ -185,18 +185,14 @@ def run_stch_set_bo(problem, d, m, ref_point, n_init, n_iters, q, seed, mu=0.1, 
         try:
             model = fit_model(train_X, train_Y)
 
-            # Normalize using posterior mean predictions — mirrors
-            # get_chebyshev_scalarization(weights, Y=pred) pattern.
-            with torch.no_grad():
-                pred = model.posterior(train_X).mean
-            Y_bounds = torch.stack([pred.min(dim=0).values, pred.max(dim=0).values])
-
+            # No explicit Y normalization: SingleTaskGP uses Standardize by default,
+            # mapping each objective to ~N(0,1). Thompson samples in forward() are
+            # already on a consistent scale. Y_bounds would double-normalize.
             acqf = qSTCHSet(
                 model=model,
                 ref_point=ref_point,
                 mu=mu,
                 sampler=SobolQMCNormalSampler(sample_shape=torch.Size([opt["mc_samples"]])),
-                Y_bounds=Y_bounds,
                 maximize=True,
             )
 
