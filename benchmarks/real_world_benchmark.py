@@ -178,15 +178,15 @@ def optimize_qnehvi(problem, model, train_x, train_obj, sampler, bounds, batch_s
     return new_x, new_obj, new_obj_true
 
 
-def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype):
+def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batch_size, ref_point, device, dtype, mu=0.1, K=None):
     # No explicit Y normalization: ModelListGP uses Standardize, which maps
     # each objective to ~N(0,1) in the posterior. Thompson samples in forward()
-    # are already on a consistent scale, so mu=0.1 is appropriate without
+    # are already on a consistent scale, so mu is appropriate without
     # additional normalization. Y_bounds would double-normalize and distort gradients.
     acq = qSTCHSet(
         model=model,
         ref_point=ref_point,
-        mu=0.1,
+        mu=mu,
         sampler=sampler,
     )
     candidates, _ = optimize_acqf(
@@ -203,15 +203,18 @@ def optimize_qstch_set(problem, model, train_x, train_obj, sampler, bounds, batc
     return new_x, new_obj, new_obj_true
 
 
-def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dtype, mc_samples: int = 128):
+def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dtype, mc_samples: int = 128, stch_mu: float = 0.1, stch_K: int = None):
     problem = get_problem(problem_name, device, dtype)
     num_obj = problem.num_objectives
-    batch_size = num_obj  # K = m rule
+    batch_size = num_obj  # K = m rule (for BO iteration candidates)
     ref_point = problem.ref_point.to(device=device, dtype=dtype)
     bounds = problem.bounds.to(device=device, dtype=dtype)
+    if stch_K is None:
+        stch_K = num_obj  # default K = m
 
     print(f"\n{'='*60}")
     print(f"Problem: {problem_name} | m={num_obj} | d={problem.dim} | K={batch_size} | seeds={n_seeds} | MC={mc_samples}")
+    print(f"qSTCH-Set config: mu={stch_mu}, K={stch_K}")
     print(f"{'='*60}")
 
     methods = ["random", "qnparego", "qehvi", "qnehvi", "qstch_set"]
@@ -265,7 +268,8 @@ def run_benchmark(problem_name: str, n_seeds: int, output_dir: Path, device, dty
                 elif method == "qstch_set":
                     new_x, new_obj, new_obj_true = optimize_qstch_set(
                         problem, model, d["train_x"], d["train_obj"],
-                        sampler, bounds, batch_size, ref_point, device, dtype
+                        sampler, bounds, batch_size, ref_point, device, dtype,
+                        mu=stch_mu, K=stch_K
                     )
 
                 d["train_x"] = torch.cat([d["train_x"], new_x])
@@ -409,6 +413,8 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--device", type=str,
                         default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--mu", type=float, default=0.1, help="STCH-Set temperature (default 0.1)")
+    parser.add_argument("--K", type=int, default=None, help="STCH-Set size K (default = m)")
     args = parser.parse_args()
 
     dtype = torch.double
@@ -419,4 +425,4 @@ if __name__ == "__main__":
     else:
         out = Path(args.output_dir)
 
-    run_benchmark(args.problem, args.seeds, out, device, dtype, mc_samples=args.mc_samples)
+    run_benchmark(args.problem, args.seeds, out, device, dtype, mc_samples=args.mc_samples, stch_mu=args.mu, stch_K=args.K)
