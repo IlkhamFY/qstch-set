@@ -46,6 +46,7 @@ def smooth_chebyshev(
     weights: torch.Tensor,
     ref_point: Optional[torch.Tensor] = None,
     mu: float = 0.1,
+    weight_mode: str = "original",
 ) -> torch.Tensor:
     """Smooth Tchebycheff scalarization.
 
@@ -107,16 +108,26 @@ def smooth_chebyshev(
         )
 
     # Compute smooth Tchebycheff scalarization.
-    # Per Lin et al. ICML 2024: g_STCH = mu * log(sum(exp(f_i - z*_i) / mu))
     #
-    # Weights are applied as log-additive terms to preserve the temperature mu:
+    # Two modes for weight application:
+    #
+    # "original" (Lin et al. ICML 2024, Eq. 5):
+    #   logsumexp(w_i * (f_i - z*_i) / mu)
+    #   Weights scale deviations INSIDE the exp. Effective temperature = mu/m
+    #   for uniform weights. This is sharper with more objectives.
+    #   All theorems (3.7-3.10) are proven for this formulation.
+    #
+    # "log_additive":
     #   logsumexp((f_i - z*_i) / mu + log(w_i))
-    # This is equivalent to: log(sum(w_i * exp((f_i - z*_i) / mu)))
+    #   Weights as log-additive terms. Effective temperature = mu (constant).
+    #   Mathematically equivalent to: log(sum(w_i * exp((f_i - z*_i) / mu)))
     #
-    # IMPORTANT: Do NOT multiply weights inside the exp argument as w*(f-z*)/mu,
-    # because with normalized weights (sum=1, w_i=1/m), this reduces the effective
-    # temperature to mu/m, collapsing gradients. See docs/ACQUISITION_ANALYSIS.md.
-    deviations = (Y - ref_point) / mu + torch.log(weights)
+    if weight_mode == "original":
+        deviations = weights * (Y - ref_point) / mu
+    elif weight_mode == "log_additive":
+        deviations = (Y - ref_point) / mu + torch.log(weights)
+    else:
+        raise ValueError(f"weight_mode must be 'original' or 'log_additive', got '{weight_mode}'")
 
     # BoTorch maximizes utility, so negate the scalarization:
     # Lower Y → lower g_STCH → higher utility (correct for minimization objectives)
@@ -130,6 +141,7 @@ def smooth_chebyshev_set(
     weights: torch.Tensor,
     ref_point: Optional[torch.Tensor] = None,
     mu: float = 0.1,
+    weight_mode: str = "original",
 ) -> torch.Tensor:
     """Smooth Tchebycheff Set scalarization ("Few for Many").
 
@@ -203,16 +215,17 @@ def smooth_chebyshev_set(
     inner = -mu * torch.logsumexp(-Y / mu, dim=-2)
 
     # Outer aggregation: Smooth max over objectives (dim=-1, the m dimension)
-    # Per Lin et al. ICLR 2025: S = mu * logsumexp((inner_i - z*_i) / mu)
     #
-    # Weights are applied as log-additive terms to preserve the temperature mu:
-    #   logsumexp((inner_i - z*_i) / mu + log(w_i))
-    #
-    # IMPORTANT: Do NOT multiply weights inside the exp argument as w*(inner-z*)/mu,
-    # because with normalized weights (sum=1, w_i=1/m), this reduces the effective
-    # temperature to mu/m, collapsing gradients. See docs/ACQUISITION_ANALYSIS.md.
+    # Two modes (see smooth_chebyshev docstring for details):
+    # "original": w_i * (inner_i - z*_i) / mu  [Lin et al., effective temp = mu/m]
+    # "log_additive": (inner_i - z*_i) / mu + log(w_i)  [constant temp = mu]
     # Shape: (...)
-    S = mu * torch.logsumexp((inner - ref_point) / mu + torch.log(weights), dim=-1)
+    if weight_mode == "original":
+        S = mu * torch.logsumexp(weights * (inner - ref_point) / mu, dim=-1)
+    elif weight_mode == "log_additive":
+        S = mu * torch.logsumexp((inner - ref_point) / mu + torch.log(weights), dim=-1)
+    else:
+        raise ValueError(f"weight_mode must be 'original' or 'log_additive', got '{weight_mode}'")
 
     # Return negative for maximization (BoTorch maximizes utility)
     # Utility = -S

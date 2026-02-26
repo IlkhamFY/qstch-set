@@ -96,6 +96,7 @@ class qSTCHSet(MCAcquisitionFunction):
         sampler: Optional[SobolQMCNormalSampler] = None,
         X_pending: Optional[Tensor] = None,
         maximize: bool = True,
+        weight_mode: str = "original",
     ) -> None:
         if sampler is None:
             sampler = SobolQMCNormalSampler(sample_shape=torch.Size([256]))
@@ -112,6 +113,7 @@ class qSTCHSet(MCAcquisitionFunction):
 
         self.mu = mu
         self.maximize = maximize
+        self.weight_mode = weight_mode
 
         # Handle Y_bounds (new API) or Y_range/Y_min (legacy)
         if Y_bounds is not None:
@@ -174,6 +176,7 @@ class qSTCHSet(MCAcquisitionFunction):
             weights=self.weights,
             ref_point=ref,
             mu=self.mu,
+            weight_mode=self.weight_mode,
         )
 
         # Average over MC samples (dim 0)
